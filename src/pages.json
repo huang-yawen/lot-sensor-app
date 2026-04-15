@@ -1,0 +1,66 @@
+{
+  "pages": [
+    //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+    {
+      "path": "pages/nav/nav",
+      "style": {
+        "navigationBarTitleText": "统一导航入口"
+      }
+    },
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "数据监测中心",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/historyInfo/historyInfo",
+      "style": {
+        "navigationBarTitleText": "传感器历史数据",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/behaviorInfo/behaviorInfo",
+      "style": {
+        "navigationBarTitleText": "行为历史数据",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/errHistory/errHistory",
+      "style": {
+        "navigationBarTitleText": "故障历史记录",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/deviceInfo/deviceInfo",
+      "style": {
+        "navigationBarTitleText": "设备管理中心",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/directPage/directPage",
+      "style": {
+        "navigationBarTitleText": "指令配置中心",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/behaviorRealTime/behaviorRealTime",
+      "style": {
+        "navigationBarTitleText": "行为实时数据",
+        "enablePullDownRefresh": true
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "数据监测中心",
+    "navigationBarBackgroundColor": "#F8F8F8",
+    "backgroundColor": "#F8F8F8"
+  }
+}
