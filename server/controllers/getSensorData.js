@@ -1,5 +1,5 @@
 const promisePool = require('../config/promisepool')
-const { formatDataWithUnit } = require('../utils/helper')
+const { formatDataWithUnit, buildDisplayFieldUnits } = require('../utils/helper')
 
 module.exports= async (req, res) => {
     try {
@@ -17,6 +17,8 @@ module.exports= async (req, res) => {
         });
 
         const searchMapper = ['id', 'd_no AS 设备编号'];
+        searchMapper.push('pid1 AS 物体编号1');
+        searchMapper.push('pid2 AS 物体编号2');
         for (let key in fieldMapping) {
             searchMapper.push(`${key} AS \`${fieldMapping[key]}\``);
         }
@@ -30,11 +32,12 @@ module.exports= async (req, res) => {
         }
 
         const [sensorData] = await promisePool.query(
-            `SELECT ${searchMapper.join(',')} FROM t_sensor_data${whereClause} ORDER BY id`,
+            `SELECT ${searchMapper.join(',')} FROM t_sensor_data${whereClause} ORDER BY id `,
             params
         );
 
         const proccessData = formatDataWithUnit(sensorData, fieldMapping, fieldUnit)
+        const fieldUnits = buildDisplayFieldUnits(fieldMapping, fieldUnit)
         // t_error_msg
         const [errorMapper] = await promisePool.query('select id ,d_no as `设备编号`,c_time as `更新时间`,e_msg as `故障原因` from t_error_msg')
         console.log(errorMapper)
@@ -79,6 +82,7 @@ module.exports= async (req, res) => {
             success: true,
             message: '成功了',
             proccessData,
+            fieldUnits,
             sortedData,
             behaviorOutcome
         });

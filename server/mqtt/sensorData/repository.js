@@ -3,18 +3,19 @@ const promisePool = require('../../config/promisepool')
 async function saveSensorData(info) {
     const params = [
         info.VID ?? null,
+        //dno每次上传一样的
         info.PID1 ?? null,
         info.PID2 ?? null,
         info.Tin ?? null,
         info.Tout ?? null,
         info.LXin ?? null,
-        info.Time ?? null,
-        info.c_time
+        info.c_time ?? null,
+        info.online ?? null,
     ]
 
     try {
         await promisePool.execute(
-            `INSERT INTO t_sensor_data (VID, PID1, PID2, Tin, Tout, LXin, Time, c_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO t_sensor_data (d_no, pid1,pid2,field1, field2, field3, c_time, online) VALUES (?, ?, ?, ?,?, ?, ?,?)`,
             params
         )
         console.log('[SensorData] Data saved to database successfully')

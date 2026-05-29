@@ -11,6 +11,42 @@ function parsePayload(payload) {
     }
 }
 
+function formatDateTime(date) {
+    const d = new Date(date)
+    if (Number.isNaN(d.getTime())) {
+        return null
+    }
+
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const hours = String(d.getHours()).padStart(2, '0')
+    const minutes = String(d.getMinutes()).padStart(2, '0')
+    const seconds = String(d.getSeconds()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+function normalizeDateTime(value) {
+    if (value == null || value === '') {
+        return null
+    }
+
+    if (value instanceof Date || typeof value === 'number') {
+        return formatDateTime(value)
+    }
+
+    if (typeof value !== 'string') {
+        return null
+    }
+
+    const trimmed = value.trim()
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(trimmed)) {
+        return trimmed
+    }
+
+    return formatDateTime(trimmed)
+}
+
 async function handleMessage(topic, payload) {
     if (topic !== SENSOR_TOPIC) {
         return null
@@ -21,7 +57,7 @@ async function handleMessage(topic, payload) {
         return null
     }
 
-    info.c_time = new Date()
+    info.c_time = normalizeDateTime(info.Time) || formatDateTime(new Date())
 
     console.log('[SensorData] Received message:', { topic, data: info })
 
@@ -37,5 +73,6 @@ async function handleMessage(topic, payload) {
 module.exports = {
     SENSOR_TOPIC,
     handleMessage,
-    parsePayload
+    parsePayload,
+    normalizeDateTime
 }

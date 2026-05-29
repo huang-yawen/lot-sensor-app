@@ -51,7 +51,7 @@
       </view>
     </scroll-view>
 	<view class="chart-section">
-	    <LineBar :data="store.paginationData||[]"/>
+	    <LineBar :data="store.paginationData||[]" :fieldUnits="store.fieldUnits"/>
 	</view>
   </view>
 </template>

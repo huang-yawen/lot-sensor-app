@@ -4,6 +4,7 @@ import { get } from "../utils/request"
 
 export const sensorStore = defineStore("sensorStore", () => {
   const sensorData = ref({})
+  const fieldUnits = ref({})
 
   const sensorValue = () => sensorData.value
 
@@ -12,8 +13,9 @@ export const sensorStore = defineStore("sensorStore", () => {
 
     console.log("接口数据:", response.data)
 
-    sensorData.value = response.data  
+    sensorData.value = response.data
+    fieldUnits.value = response.data?.fieldUnits || {}
   }
 
-  return { sensorData, fetchData, sensorValue }
+  return { sensorData, fieldUnits, fetchData, sensorValue }
 })

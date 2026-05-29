@@ -79,7 +79,7 @@
       </button>
     </view>
 	<view class="chart-section" v-if="dataList.length>0">
-	    <LineBar :data="dataList" :pageSize="pageSize"/>
+	    <LineBar :data="dataList" :pageSize="pageSize" :fieldUnits="store.fieldUnits"/>
 	</view>
   </view>
 </template>

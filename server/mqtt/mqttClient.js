@@ -6,62 +6,39 @@ const { handleMessage: handleBehaviorData, BEHAVIOR_TOPIC } = require('./behavio
 const { handleMessage: handleErrorData, ERROR_TOPIC } = require('./ErrorMsg/index')
 
 class MqttClient extends EventEmitter {
-    static defaultSetting = {
-        url: 'mqtt://localhost:1883',
-        option: {
-            clientId: 'mqtt-client'
-        },
-        subscribeTopics: [
-            { topic: 'testTopic/#', qos: 1 },
-            { topic: '/isAlive/#', qos: 1 }
-        ]
-    }
-
-    constructor(config = {}) {
+    constructor(config) {
         super()
-        this.config = {
-            url: config.url || MqttClient.defaultSetting.url,
-            option: { ...MqttClient.defaultSetting.option, ...config.option },
-            subscribeTopics: config.subscribeTopics || MqttClient.defaultSetting.subscribeTopics
-        }
-        this.client = null
+        this.config = config
         this.isConnected = false
-        this.timer = {}
-        this.aliveDeviceIds = new Set()
-        this.offlineMessageQueues = new Map()
-        this.initClient()
+        this.messageQueue = []
+        this.deviceLastAlive = new Map()
+        this.client = this.createClient()
     }
 
-    initClient() {
-        this.client = mqtt.connect(this.config.url, this.config.option)
-        this.bindClientEvents()
-    }
+    createClient() {
+        const client = mqtt.connect(this.config.url, this.config.option)
 
-    bindClientEvents() {
-        this.client.on('connect', () => {
+        client.on('connect', () => {
             this.isConnected = true
             console.log('MQTT connected')
             this.subscribeAllTopics()
+            this.processQueue()
         })
 
-        this.client.on('error', (err) => {
-            console.error('MQTT connection error:', err.message)
-        })
-
-        this.client.on('offline', () => {
-            this.isConnected = false
-            console.log('MQTT client offline')
-        })
-
-        this.client.on('close', () => {
+        client.on('error', (err) => {
+            console.error('MQTT error:', err.message)
             this.isConnected = false
         })
 
-        this.client.on('reconnect', () => {
+        client.on('close', () => {
+            this.isConnected = false
+        })
+
+        client.on('reconnect', () => {
             console.log('MQTT reconnecting...')
         })
 
-        this.client.on('message', (topic, payload) => {
+        client.on('message', async (topic, payload) => {
             const normalizedTopic = topic.replace(/^\/+/, '')
 
             if (normalizedTopic.startsWith('isAlive/')) {
@@ -79,27 +56,29 @@ class MqttClient extends EventEmitter {
             }
 
             if (topic === SENSOR_TOPIC) {
-                const result = handleSensorData(topic, payload)
+                const result = await handleSensorData(topic, payload)
                 if (result) {
                     this.emit('message', topic, result)
                 }
             }
 
             if (topic === BEHAVIOR_TOPIC) {
-                const result = handleBehaviorData(topic, payload)
+                const result = await handleBehaviorData(topic, payload)
                 if (result) {
                     this.emit('message', topic, result)
                 }
             }
 
             if (topic === ERROR_TOPIC) {
-                const result = handleErrorData(topic, payload)
+                const result = await handleErrorData(topic, payload)
                 if (result) {
                     this.emit('message', topic, result)
                 }
             }
 
         })
+
+        return client
     }
 
     subscribeAllTopics() {
@@ -122,224 +101,86 @@ class MqttClient extends EventEmitter {
     }
 
     async publishJsonToDevice(deviceId, topic, payload, options = {}) {
-        const finalDeviceId = this.normalizeDeviceId(deviceId)
-
-        const message = {
-            topic,
-            payload: JSON.stringify(payload),
-            options,
-            queuedAt: new Date().toISOString()
+        if (!this.isConnected) {
+            const queueItem = { deviceId, topic, payload, options, timestamp: Date.now() }
+            this.messageQueue.push(queueItem)
+            console.log(`MQTT not connected, message queued for device ${deviceId}`)
+            return { status: 'queued', deviceId, queueLength: this.messageQueue.length }
         }
 
-        let publishResult
-        try {
-            publishResult = await this.publish(topic, message.payload, options)
-            console.log(`[MQTT] 消息已发布到主题 ${topic}`)
-        } catch (err) {
-            console.error(`[MQTT] 发布失败 ${topic}:`, err.message)
-            publishResult = { error: err.message }
-        }
+        const finalTopic = topic
+        console.log(`[MQTT] Publishing to ${finalTopic}:`, payload)
 
-        if (finalDeviceId !== null && !this.isDeviceAlive(finalDeviceId)) {
-            this.enqueueOfflineMessage(finalDeviceId, message)
-            return {
-                status: 'queued',
-                deviceId: finalDeviceId,
-                queueLength: this.getOfflineQueueLength(finalDeviceId),
-                mqtt: publishResult
+        return new Promise((resolve) => {
+            this.client.publish(finalTopic, JSON.stringify(payload), options, (err) => {
+                if (err) {
+                    console.error(`MQTT publish failed to ${deviceId}:`, err.message)
+                    resolve({ status: 'failed', deviceId, error: err.message })
+                } else {
+                    resolve({ status: 'published', deviceId })
+                }
+            })
+        })
+    }
+
+    publish(topic, payload, options = {}) {
+        return new Promise((resolve, reject) => {
+            if (!this.isConnected) {
+                const queueItem = { topic, payload, options, timestamp: Date.now() }
+                this.messageQueue.push(queueItem)
+                console.log(`MQTT not connected, message queued: ${topic}`)
+                resolve({ status: 'queued', queueLength: this.messageQueue.length })
+                return
             }
+
+            this.client.publish(topic, payload, options, (err) => {
+                if (err) {
+                    console.error('MQTT publish error:', err.message)
+                    reject(err)
+                } else {
+                    resolve({ status: 'published' })
+                }
+            })
+        })
+    }
+
+    processQueue() {
+        while (this.messageQueue.length > 0 && this.isConnected) {
+            const item = this.messageQueue.shift()
+            this.client.publish(item.topic, item.payload, item.options, (err) => {
+                if (err) {
+                    console.error('Failed to publish queued message:', err.message)
+                }
+            })
         }
-
-        return {
-            status: 'published',
-            deviceId: finalDeviceId,
-            mqtt: publishResult
-        }
-    }
-
-    normalizeDeviceId(id) {
-        if (id === undefined || id === null || id === '' || id === 'null') {
-            return null
-        }
-        return String(id)
-    }
-
-    isDeviceAlive(id) {
-        const finalDeviceId = this.normalizeDeviceId(id)
-        return finalDeviceId !== null && this.aliveDeviceIds.has(finalDeviceId)
-    }
-
-    enqueueOfflineMessage(id, message) {
-        const finalDeviceId = this.normalizeDeviceId(id)
-        if (finalDeviceId === null) return
-
-        const queue = this.offlineMessageQueues.get(finalDeviceId) || []
-        queue.push(message)
-        this.offlineMessageQueues.set(finalDeviceId, queue)
-        console.log(`Device ${finalDeviceId} is offline, queued MQTT message. queue length: ${queue.length}`)
-    }
-
-    getOfflineQueueLength(id) {
-        const finalDeviceId = this.normalizeDeviceId(id)
-        if (finalDeviceId === null) return 0
-        return this.offlineMessageQueues.get(finalDeviceId)?.length || 0
     }
 
     markDeviceAlive(id) {
-        const finalDeviceId = this.normalizeDeviceId(id)
-        if (finalDeviceId === null) return
-
-        clearTimeout(this.timer[finalDeviceId])
-        delete this.timer[finalDeviceId]
-        this.aliveDeviceIds.add(finalDeviceId)
-        console.log(`${finalDeviceId} device is alive`)
-        this.flushOfflineQueue(finalDeviceId)
-    }
-
-    markDeviceOffline(id) {
-        const finalDeviceId = this.normalizeDeviceId(id)
-        if (finalDeviceId === null) return
-
-        this.aliveDeviceIds.delete(finalDeviceId)
-        console.log(`${finalDeviceId} device heartbeat timeout`)
-    }
-
-    async flushOfflineQueue(id) {
-        const finalDeviceId = this.normalizeDeviceId(id)
-        const queue = this.offlineMessageQueues.get(finalDeviceId)
-        if (!queue || queue.length === 0) return
-
-        this.offlineMessageQueues.delete(finalDeviceId)
-
-        for (let index = 0; index < queue.length; index += 1) {
-            const message = queue[index]
-            try {
-                await this.publish(message.topic, message.payload, message.options)
-            } catch (err) {
-                const remainingMessages = queue.slice(index)
-                this.offlineMessageQueues.set(finalDeviceId, remainingMessages)
-                console.error(`Flush offline queue failed for device ${finalDeviceId}:`, err.message)
-                return
-            }
-        }
-
-        console.log(`Flushed offline MQTT queue for device ${finalDeviceId}, count: ${queue.length}`)
-    }
-
-    waitUntilConnected(timeout = 5000) {
-        if (this.client && this.isConnected) {
-            return Promise.resolve()
-        }
-
-        return new Promise((resolve, reject) => {
-            if (!this.client) {
-                reject(new Error('MQTT client is not initialized'))
-                return
-            }
-
-            const cleanup = () => {
-                clearTimeout(timer)
-                this.client.off('connect', handleConnect)
-                this.client.off('error', handleError)
-            }
-
-            const handleConnect = () => {
-                cleanup()
-                resolve()
-            }
-
-            const handleError = (err) => {
-                cleanup()
-                reject(err)
-            }
-
-            const timer = setTimeout(() => {
-                cleanup()
-                reject(new Error('MQTT client connect timeout'))
-            }, timeout)
-
-            this.client.once('connect', handleConnect)
-            this.client.once('error', handleError)
-        })
-    }
-
-    async publish(topic, payload, options = {}) {
-        if (!this.client) {
-            throw new Error('MQTT client is not initialized')
-        }
-
-        if (!this.isConnected) {
-            console.warn(`[MQTT] 客户端未连接，尝试连接...`)
-            try {
-                await this.waitUntilConnected(10000)
-                console.log(`[MQTT] 客户端连接成功`)
-            } catch (err) {
-                console.error(`[MQTT] 客户端连接失败:`, err.message)
-                throw err
-            }
-        }
-
-        return new Promise((resolve, reject) => {
-            let firstPublished = false
-            let secondPublished = false
-            let hasRejected = false
-
-            const handlePublish = (err) => {
-                if (hasRejected) return
-                if (err) {
-                    hasRejected = true
-                    console.error(`[MQTT] 发布失败 ${topic}:`, err.message)
-                    reject(err)
-                    return
-                }
-
-                firstPublished = true
-                if (secondPublished) {
-                    console.log(`[MQTT] 发布成功 ${topic}:`, payload.substring(0, 100))
-                    resolve({ topic, payload })
-                }
-            }
-
-            const handleSecondPublish = (err) => {
-                if (hasRejected) return
-                if (err) {
-                    hasRejected = true
-                    console.error(`[MQTT] 第二发布失败 ${topic}:`, err.message)
-                    reject(err)
-                    return
-                }
-
-                secondPublished = true
-                if (firstPublished) {
-                    console.log(`[MQTT] 发布成功 ${topic}:`, payload.substring(0, 100))
-                    resolve({ topic, payload })
-                }
-            }
-
-            this.client.publish(topic, payload, options, handlePublish)
-            setTimeout(() => {
-                this.client.publish(topic, payload, options, handleSecondPublish)
-            }, 100)
-        })
+        this.deviceLastAlive.set(id, Date.now())
     }
 
     checkIfAlive(id) {
         const finalDeviceId = this.normalizeDeviceId(id)
-        if (finalDeviceId === null) return
+        const lastAlive = this.deviceLastAlive.get(finalDeviceId)
+        const now = Date.now()
+        const isAlive = lastAlive && (now - lastAlive) < 30000
 
-        setInterval(() => {
-            const heartbeatPayload = `${Date.now()} check alive`
-            this.client.publish(`checkIfAlive/${finalDeviceId}`, heartbeatPayload, { qos: 1, retain: false }, err => {
-                if (err) {
-                    console.error('Check alive publish failed:', err.message)
-                }
-            })
+        if (!isAlive) {
+            console.log(`Device ${finalDeviceId} is offline`)
+        }
 
-            if (this.timer[finalDeviceId]) clearTimeout(this.timer[finalDeviceId])
-            this.timer[finalDeviceId] = setTimeout(() => {
-                this.markDeviceOffline(finalDeviceId)
-            }, 3000)
-        }, 10000)
+        return isAlive
+    }
+
+    normalizeDeviceId(id) {
+        if (!id) return null
+        return String(id).trim()
+    }
+
+    end() {
+        if (this.client) {
+            this.client.end()
+        }
     }
 }
 

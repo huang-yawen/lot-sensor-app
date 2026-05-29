@@ -80,7 +80,7 @@
     </view>
 	
 	<view class="chart-section">
-	    <LineBar :data="data" :pageSize="pageSize"/>
+	    <LineBar :data="data" :pageSize="pageSize" :fieldUnits="store.fieldUnits"/>
 	</view>
   </view>
 </template>

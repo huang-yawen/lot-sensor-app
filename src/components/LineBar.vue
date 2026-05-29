@@ -10,11 +10,69 @@ import * as echarts from 'echarts'
 
 const props = defineProps({
   data: { type: Array, default: () => [] },
-  pageSize: { type: Number, default: 5 }
+  pageSize: { type: Number, default: 5 },
+  fieldUnits: { type: Object, default: () => ({}) }
 })
 
 let mychart = null
 
+const normalizeUnit = (unit) => {
+  return unit === undefined || unit === null ? '' : String(unit).trim()
+}
+
+const getFieldUnit = (field) => {
+  return normalizeUnit(props.fieldUnits?.[field])
+}
+
+const formatValueWithUnit = (value, unit) => {
+  if (value === undefined || value === null || value === '') return ''
+  return unit ? `${value} ${unit}` : String(value)
+}
+
+const escapeHtml = (value) => {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+const buildTooltipFormatter = (params) => {
+  const items = Array.isArray(params) ? params : [params]
+  if (!items.length) return ''
+
+  const title = items[0]?.axisValueLabel || items[0]?.name || ''
+  const lines = title ? [escapeHtml(title)] : []
+  items.forEach(item => {
+    const unit = getFieldUnit(item.seriesName)
+    lines.push(`${item.marker || ''}${escapeHtml(item.seriesName)}: ${escapeHtml(formatValueWithUnit(item.value, unit))}`)
+  })
+  return lines.join('<br/>')
+}
+
+const buildDataViewContent = (option) => {
+  const xData = option?.xAxis?.[0]?.data || []
+  const seriesList = option?.series || []
+  const headers = ['时间'].concat(seriesList.map(item => {
+    const unit = getFieldUnit(item.name)
+    return unit ? `${item.name} (${unit})` : item.name
+  }))
+
+  const rows = xData.map((time, index) => {
+    return [time].concat(seriesList.map(item => {
+      const unit = getFieldUnit(item.name)
+      return formatValueWithUnit(item.data?.[index], unit)
+    }))
+  })
+
+  const headerHtml = headers.map(item => `<th>${escapeHtml(item)}</th>`).join('')
+  const rowsHtml = rows.map(row => {
+    return `<tr>${row.map(item => `<td>${escapeHtml(item)}</td>`).join('')}</tr>`
+  }).join('')
+
+  return `<table style="width:100%;border-collapse:collapse;text-align:center;"><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`
+}
 
 const updateChart = (source) => {
   if (!mychart) return
@@ -47,7 +105,7 @@ const updateChart = (source) => {
     });
 
     const elemKeys = Object.keys(json[0])
-    const exclude = ['id', '设备编号', '数据类型', '创立时间', '采集时间']
+    const exclude = ['id', '设备编号', '数据类型', '创立时间', '采集时间',"物体编号1","物体编号2"]
     const fields = elemKeys.filter(k => !exclude.includes(k))
 
     const series = fields.map(field => ({
@@ -62,6 +120,8 @@ const updateChart = (source) => {
         return isNaN(num) ? 0 : num
       })
     }))
+    const yAxisUnits = [...new Set(fields.map(getFieldUnit).filter(Boolean))]
+    const yAxisUnit = yAxisUnits.length === 1 ? yAxisUnits[0] : ''
 
     mychart.setOption({
       tooltip: {
@@ -81,9 +141,10 @@ const updateChart = (source) => {
           color: '#fff',
           fontSize: 12
         },
-        confine: true
+        confine: true,
+        formatter: buildTooltipFormatter
       },
-      legend: { data: fields, bottom:'-10px',left:'center' },
+      legend: { data: fields, bottom:'0px',left:'center' },
       grid: { 
         left: '3%', 
         right: '5%', 
@@ -103,9 +164,9 @@ const updateChart = (source) => {
 	             show: true, 
 	             type: ['line', 'bar'] 
 	         },
-	         restore: { show: true }, // 重置
-	         dataView: { show: true, readOnly: false }, // 数据视图
-	         saveAsImage: { show: true }, // ✅ 建议加上这个，测试点击是否有反应
+	         restore: { show: true },
+	         dataView: { show: true, readOnly: false, optionToContent: buildDataViewContent },
+	         saveAsImage: { show: true },
 	     }
 	 },
       xAxis: {
@@ -113,7 +174,13 @@ const updateChart = (source) => {
         data: times,
         axisLabel: { rotate: 25, fontSize: 10, interval: 0 }
       },
-      yAxis: { type: 'value', axisLabel: { fontSize: 10 } },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          fontSize: 10,
+          formatter: value => formatValueWithUnit(value, yAxisUnit)
+        }
+      },
       series
     }, true)
   } catch (err) {
@@ -142,7 +209,7 @@ const initChart = () => {
   updateChart(props.data)
 }
 
-watch(() => [props.data, props.pageSize], () => {
+watch(() => [props.data, props.pageSize, props.fieldUnits], () => {
   updateChart(props.data)
 }, { deep: true })
 
@@ -169,7 +236,7 @@ onBeforeUnmount(() => {
 
 .chart-container {
   width: 100%;
-  height: 550rpx;
+  height: 600rpx;
   background: #fff;
   border-radius: 16rpx;
   box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.05);

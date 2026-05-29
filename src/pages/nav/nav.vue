@@ -26,9 +26,9 @@
 
     <view class="group">
       <text class="group-title">设备数据</text>
-      <navigator class="nav-item" url="/pages/deviceInfo/deviceInfo"
+      <!-- <navigator class="nav-item" url="/pages/deviceInfo/deviceInfo"
         >设备管理中心</navigator
-      >
+      > -->
       <navigator class="nav-item" url="/pages/directPage/directPage"
         >指令配置中心</navigator
       >

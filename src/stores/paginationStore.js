@@ -7,6 +7,7 @@ export const paginationStore = defineStore("paginationStore", () => {
   const total = ref(0)
   const currentPage = ref(1)
   const pageSize = ref(5)
+  const fieldUnits = ref({})
   const loading = ref(false)
   const type = ref("数据监测中心")
 
@@ -30,6 +31,7 @@ export const paginationStore = defineStore("paginationStore", () => {
 
       if (response.data.success) {
         paginationData.value = response.data.data.list || []
+        fieldUnits.value = response.data.data.fieldUnits || {}
         total.value = response.data.data.total || 0
         currentPage.value = response.data.data.page || 1
         pageSize.value = response.data.data.size || pageSize.value
@@ -68,6 +70,7 @@ export const paginationStore = defineStore("paginationStore", () => {
     total,
     currentPage,
     pageSize,
+    fieldUnits,
     loading,
     type,
   }

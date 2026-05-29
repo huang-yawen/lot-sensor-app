@@ -1,5 +1,5 @@
 const promisePool = require('../config/promisepool')
-const { formatDataWithUnit } = require('../utils/helper')
+const { formatDataWithUnit, buildDisplayFieldUnits } = require('../utils/helper')
 
 module.exports= async (req, res) => {
     const type = req.query.type || 'sensor'
@@ -66,6 +66,7 @@ module.exports= async (req, res) => {
 
         const [rows] = await promisePool.query(sql, params);
         const processedData = formatDataWithUnit(rows, fieldMapping, fieldUnit)
+        const fieldUnits = buildDisplayFieldUnits(fieldMapping, fieldUnit)
         const countSql = `
             SELECT COUNT(*) AS total
             FROM ${dataTable}
@@ -82,6 +83,7 @@ module.exports= async (req, res) => {
             success: true,
             data: {
                 list: processedData,
+                fieldUnits,
                 total,
                 page,
                 size: pageSize
