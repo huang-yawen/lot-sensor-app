@@ -1,0 +1,64 @@
+const promisePool = require('../../config/promisepool')
+
+const buildWhere = (query) => {
+    const keyword = query.keyword?.trim() || ''
+    const startTime = query.startTime || ''
+    const endTime = query.endTime || ''
+    const conditions = []
+    const params = []
+
+    // 只为用户实际传入的筛选条件拼接 SQL 片段。
+    if (keyword) {
+        conditions.push('(d_no LIKE ? OR e_msg LIKE ?)')
+        params.push(`%${keyword}%`, `%${keyword}%`)
+    }
+
+    if (startTime) {
+        conditions.push('c_time >= ?')
+        params.push(startTime)
+    }
+
+    if (endTime) {
+        conditions.push('c_time <= ?')
+        params.push(endTime)
+    }
+
+    return {
+        whereClause: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+        params,
+    }
+}
+
+// 查询带分页的故障历史记录，支持关键字和时间筛选。
+module.exports = async function getErrorHistory(query) {
+    const page = parseInt(query.page) || 1
+    const pageSize = parseInt(query.pageSize) || 5
+    const offset = (page - 1) * pageSize
+    const { whereClause, params } = buildWhere(query)
+
+    const [rows] = await promisePool.query(
+        `SELECT id, d_no AS '璁惧缂栧彿', e_msg AS '鏁呴殰淇℃伅', c_time AS '鎶ラ敊鏃堕棿', type AS '鏁呴殰绫诲瀷'
+         FROM t_error_msg
+         ${whereClause}
+         ORDER BY c_time DESC
+         LIMIT ? OFFSET ?`,
+        [...params, pageSize, offset]
+    )
+
+    const countSql = `
+        SELECT COUNT(*) AS total
+        FROM t_error_msg
+        ${whereClause}
+    `
+    const [countResult] = await promisePool.query(countSql, params)
+
+    return {
+        success: true,
+        data: {
+            list: rows,
+            total: countResult[0].total,
+            page,
+            size: pageSize,
+        },
+    }
+}

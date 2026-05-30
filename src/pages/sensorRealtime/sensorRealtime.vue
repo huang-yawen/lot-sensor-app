@@ -1,9 +1,11 @@
 <template>
   <view class="page safe-area-bottom">
     <view class="header">
-      <text class="title">行为实时数据</text>
+      <text class="header-title">传感器实时数据</text>
       <view class="header-actions">
-    <navigator class="jump-link" url="/pages/menuCenter/menuCenter">返回上一级</navigator>
+        <navigator class="history-nav" url="/pages/menuCenter/menuCenter">
+          返回上一级
+        </navigator>
         <button
           class="refresh-btn"
           type="primary"
@@ -31,27 +33,28 @@
       </picker>
     </view>
 
-    <view class="state" v-if="loading">
-      <text>加载中...</text>
-    </view>
-    <view class="state" v-else-if="!filteredDataList.length">
-      <text>暂无行为数据</text>
+    <view class="empty" v-if="!loading && !filteredDataList.length">
+      <text>暂无数据</text>
     </view>
 
-    <scroll-view class="list" scroll-y="true" v-else>
+    <view class="loading" v-if="loading">
+      <text>加载中...</text>
+    </view>
+
+    <scroll-view class="list" scroll-y="true" v-if="filteredDataList.length">
       <view
         class="data-card"
         v-for="(item, idx) in filteredDataList"
         :key="idx"
       >
-        <view class="row" v-for="[key, value] in visibleEntries(item, visibility)" :key="key">
-          <text class="key">{{ key }}：</text>
-          <text class="value">{{ renderText(value) }}</text>
+        <view class="item-row" v-for="[key, value] in visibleEntries(item, visibility)" :key="key">
+          <text class="item-key">{{ key }}：</text>
+          <text class="item-value">{{ formatValue(key, value) }}</text>
         </view>
       </view>
     </scroll-view>
 	<view class="chart-section">
-	    <LineBar :data="store.paginationData||[]" :fieldUnits="store.fieldUnits"/>
+	  <LineBar :data="data" :fieldUnits="store.fieldUnits" />
 	</view>
   </view>
 </template>
@@ -59,18 +62,20 @@
 <script setup>
 import { computed, ref } from "vue"
 import { onLoad, onPullDownRefresh } from "@dcloudio/uni-app"
-import { paginationStore } from "../../stores/paginationStore"
+import { sensorStore } from "../../stores/sensorStore"
 import { displayStore } from "../../stores/displayStore"
 import { shouldHideField, visibleEntries } from "../../utils/fieldVisibility"
-import LineBar from "../../components/LineBar.vue"
-const store = paginationStore()
+import LineBar from '../../components/LineBar.vue'
+const store = sensorStore()
 const visibility = displayStore()
 const loading = ref(false)
 const selectedValue = ref("")
 const hideDeviceSelector = computed(() => shouldHideField("设备编号ID", visibility))
 
+const data=computed(()=>store.sensorData?.proccessData)
 const sourceList = computed(() => {
-  return Array.isArray(store.paginationData) ? store.paginationData : []
+  const val = store.sensorData?.proccessData
+  return Array.isArray(val) ? val : []
 })
 
 const options = computed(() => {
@@ -102,6 +107,21 @@ const filteredDataList = computed(() => {
   return sourceList.value.filter((item) => item[firstKey] === selected)
 })
 
+const formatValue = (key, value) => {
+  if (key === "创立时间" && value) {
+    return new Date(value).toLocaleString("zh-CN", {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false   
+    })
+  }
+  return String(value ?? "")
+}
+
 const initSelected = () => {
   if (!sourceList.value.length) {
     selectedValue.value = ""
@@ -114,11 +134,7 @@ const initSelected = () => {
 const reloadData = async () => {
   loading.value = true
   try {
-    await store.fetchPaginationData({
-      type: "behavior",
-      currentPage: 1,
-      pageSize: 20,
-    })
+    await store.fetchData()
     initSelected()
   } finally {
     loading.value = false
@@ -129,12 +145,9 @@ const reloadData = async () => {
 const onPickChange = (event) => {
   const index = Number(event.detail.value || 0)
   const current = options.value[index]
-  if (current) selectedValue.value = current.value
-}
-
-const renderText = (val) => {
-  if (val === null || val === undefined) return ""
-  return String(val)
+  if (current) {
+    selectedValue.value = current.value
+  }
 }
 
 onLoad(async () => {
@@ -144,12 +157,13 @@ onLoad(async () => {
 onPullDownRefresh(async () => {
   await reloadData()
 })
+
 </script>
 
 <style>
 .page {
   min-height: 100vh;
-  background: #f5f8ff;
+  background-color: #f5f8ff;
   padding: 24rpx;
   box-sizing: border-box;
 }
@@ -158,13 +172,18 @@ onPullDownRefresh(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20rpx;
+  margin-bottom: 24rpx;
 }
 
-.title {
+.header-title {
   font-size: 36rpx;
-  font-weight: 600;
   color: #1f2937;
+  font-weight: 600;
+}
+
+.refresh-btn {
+  margin: 0;
+  line-height: 1.6;
 }
 
 .header-actions {
@@ -173,7 +192,7 @@ onPullDownRefresh(async () => {
   gap: 16rpx;
 }
 
-.jump-link {
+.history-nav {
   font-size: 24rpx;
   color: #2563eb;
   background: #eaf2ff;
@@ -181,11 +200,6 @@ onPullDownRefresh(async () => {
   border-radius: 12rpx;
   padding: 10rpx 16rpx;
   line-height: 1;
-}
-
-.refresh-btn {
-  margin: 0;
-  line-height: 1.6;
 }
 
 .picker-row {
@@ -215,48 +229,55 @@ onPullDownRefresh(async () => {
   color: #1f2937;
 }
 
-.state {
-  height: 220rpx;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  color: #9ca3af;
-  font-size: 28rpx;
-}
-
 .list {
-  max-height: calc(100vh - 280rpx);
+  max-height: calc(100vh - 260rpx);
 }
 
 .data-card {
   background: #ffffff;
   border: 2rpx solid #dbeafe;
   border-radius: 20rpx;
-  padding: 18rpx 22rpx;
-  margin-bottom: 16rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
 }
 
-.row {
+.item-row {
   display: flex;
   justify-content: space-between;
   border-bottom: 2rpx dashed #edf2f7;
-  padding: 12rpx 0;
+  padding: 14rpx 0;
 }
 
-.row:last-child {
+.item-row:last-child {
   border-bottom: 0;
 }
 
-.key {
-  font-size: 26rpx;
+.item-key {
   color: #2563eb;
-  margin-right: 16rpx;
+  font-size: 26rpx;
+  margin-right: 20rpx;
 }
 
-.value {
-  flex: 1;
-  text-align: right;
-  font-size: 26rpx;
+.item-value {
   color: #374151;
+  font-size: 26rpx;
+  text-align: right;
+  flex: 1;
+}
+
+.empty,
+.loading {
+  height: 240rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 28rpx;
+}
+.chart-section {
+  width: 100%;
+  min-height: 500rpx;
+  display: block;
+  clear: both;
 }
 </style>

@@ -2,55 +2,55 @@
   "pages": [
     //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
     {
-      "path": "pages/nav/nav",
+      "path": "pages/menuCenter/menuCenter",
       "style": {
         "navigationBarTitleText": "菜单中心"
       }
     },
     {
-      "path": "pages/index/index",
+      "path": "pages/sensorRealtime/sensorRealtime",
       "style": {
         "navigationBarTitleText": "数据监测中心",
         "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/historyInfo/historyInfo",
+      "path": "pages/sensorHistory/sensorHistory",
       "style": {
         "navigationBarTitleText": "传感器历史数据",
         "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/behaviorInfo/behaviorInfo",
+      "path": "pages/behaviorHistory/behaviorHistory",
       "style": {
         "navigationBarTitleText": "行为历史数据",
         "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/errHistory/errHistory",
+      "path": "pages/errorHistory/errorHistory",
       "style": {
         "navigationBarTitleText": "故障历史记录",
         "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/deviceInfo/deviceInfo",
+      "path": "pages/deviceManage/deviceManage",
       "style": {
         "navigationBarTitleText": "设备管理中心",
         "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/directPage/directPage",
+      "path": "pages/commandConfig/commandConfig",
       "style": {
         "navigationBarTitleText": "指令配置中心",
         "enablePullDownRefresh": true
       }
     },
     {
-      "path": "pages/behaviorRealTime/behaviorRealTime",
+      "path": "pages/behaviorRealtime/behaviorRealtime",
       "style": {
         "navigationBarTitleText": "行为实时数据",
         "enablePullDownRefresh": true

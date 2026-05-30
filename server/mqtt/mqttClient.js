@@ -1,9 +1,9 @@
 const mqtt = require('mqtt')
 const EventEmitter = require('events')
 const promisePool = require('../config/promisepool')
-const { handleMessage: handleSensorData, SENSOR_TOPIC } = require('./sensorData/index')
-const { handleMessage: handleBehaviorData, BEHAVIOR_TOPIC } = require('./behaviorData/index')
-const { handleMessage: handleErrorData, ERROR_TOPIC } = require('./ErrorMsg/index')
+const { handleMessage: handleSensorData, SENSOR_TOPIC } = require('./sensorRealtime/index')
+const { handleMessage: handleBehaviorData, BEHAVIOR_TOPIC } = require('./behaviorRealtime/index')
+const { handleMessage: handleErrorData, ERROR_TOPIC } = require('./errorHistory/index')
 
 class MqttClient extends EventEmitter {
     constructor(config) {
@@ -41,6 +41,7 @@ class MqttClient extends EventEmitter {
         client.on('message', async (topic, payload) => {
             const normalizedTopic = topic.replace(/^\/+/, '')
 
+            // Heartbeat messages only refresh the device alive timestamp.
             if (normalizedTopic.startsWith('isAlive/')) {
                 const id = normalizedTopic.split('/').pop()
                 this.markDeviceAlive(id)
@@ -55,6 +56,7 @@ class MqttClient extends EventEmitter {
                 return
             }
 
+            // Each topic is routed to the handler that knows how to persist it.
             if (topic === SENSOR_TOPIC) {
                 const result = await handleSensorData(topic, payload)
                 if (result) {

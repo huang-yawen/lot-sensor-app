@@ -2,13 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 require('./config/env');
-const sensorRoutes = require('./routes/sensor');
+const sensorRoutes = require('./routes/sensorRoutes');
 const mqttClient = require('./mqtt/index')
 const app = express();
 const port = Number(process.env.PORT) || 3000;
 app.use(cors());
 app.use(express.json());
      
+// Keep the API surface grouped behind a single router.
 app.use('/', sensorRoutes);
 
 // MQTT 连接状态诊断接口
