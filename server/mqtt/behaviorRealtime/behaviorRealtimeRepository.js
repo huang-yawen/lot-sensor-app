@@ -3,7 +3,9 @@ const promisePool = require('../../config/promisepool')
 async function saveBehaviorData(info) {
     // Keep the database column order aligned with the MQTT payload mapping.
     const params = [
-        info.VID ?? info.d_no ?? info.DNO ?? null,
+        // info.VID ?? info.d_no ?? info.DNO ?? null,
+        // 第三题写成默认的设备编号，因为现在只有一套设备
+        '202106',
         info.mode ?? null,
         info.fan ?? null,
         info.fan_speed ?? null,

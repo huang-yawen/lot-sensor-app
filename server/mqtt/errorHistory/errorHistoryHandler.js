@@ -58,7 +58,7 @@ async function handleMessage(topic, payload) {
         return null
     }
 
-    info.c_time = normalizeDateTime(info.Time || info.c_time) || formatDateTime(new Date())
+    info.c_time = normalizeDateTime(info.Time) || formatDateTime(new Date())
 
     console.log('[ErrorHistory] Received message:', { topic, data: info })
 

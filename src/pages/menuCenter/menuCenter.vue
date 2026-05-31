@@ -25,7 +25,7 @@
 	</view>
 
     <view class="group">
-      <text class="group-title">设备数据</text>
+      <text class="group-title">设备控制</text>
       <!-- <navigator class="nav-item" url="/pages/deviceManage/deviceManage"
         >设备管理中心</navigator
       > -->
@@ -34,9 +34,9 @@
       >
     </view>
 	<view class="group">
-		<text class="group-title">故障管理</text>
+		<text class="group-title">设备检测</text>
 		<navigator class="nav-item" url="/pages/errorHistory/errorHistory"
-		  >故障历史记录</navigator
+		  >设备状态监测记录</navigator
 		>
 	</view>
     <view class="group settings-group">

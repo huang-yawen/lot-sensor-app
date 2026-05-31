@@ -84,28 +84,21 @@ const updateChart = (source) => {
     }
 
     const times = json.map(item => {
-      let rawTime = item['创立时间'] || item['采集时间'];
+      const rawTime = item['创立时间'] || item['采集时间'] || item['创建时间'];
       if (rawTime) {
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rawTime)) {
+          return rawTime;
+        }
         let formattedTime = rawTime.replace('T', ' ').replace(/\..+/, '').replace('Z', '');
-        formattedTime = formattedTime.replace(/-/g, '/');
-        
-        const date = new Date(formattedTime);
-        if (!isNaN(date.getTime())) {
-          return date.toLocaleString('zh-CN', {
-			year:'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
-          });
+        if (/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/.test(formattedTime)) {
+          return formattedTime.replace(/\//g, '-');
         }
       }
       return '未知';
     });
 
     const elemKeys = Object.keys(json[0])
-    const exclude = ['id', '设备编号', '数据类型', '创立时间', '采集时间',"物体编号1","物体编号2"]
+    const exclude = ['id', '设备编号', '数据类型', '创建时间', '采集时间',"物体编号1","物体编号2","创立时间","风扇开关","空调开关","可调灯开关","控制模式","空调模式"]
     const fields = elemKeys.filter(k => !exclude.includes(k))
 
     const series = fields.map(field => ({

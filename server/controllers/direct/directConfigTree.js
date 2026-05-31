@@ -6,10 +6,10 @@ module.exports = async (req, res) => {
         const payload = await getDirectConfigTree(req.query)
         res.json(payload)
     } catch (err) {
-        console.log('directData出错：' + err)
+        console.log('directData 出错：' + err)
         res.status(500).json({
             success: false,
-            message: '获取数据失败'
+            message: '获取数据失败',
         })
     }
 }

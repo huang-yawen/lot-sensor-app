@@ -26,8 +26,8 @@ module.exports = async function getDeviceManageList(query) {
 
     const queryFields = buildDeviceQuery(searchMode, keywordLike)
     let [deviceData] = await promisePool.query(
-        `SELECT id, number AS '閻絻婧呯紓鏍у娇id', device_name AS '鐠佹儳顦崥宥囆?,
-                remarks AS '婢跺洦鏁?, ctime AS '閸掓稑缂撻弮鍫曟？'
+        `SELECT id, number AS '设备编号', device_name AS '设备名称',
+                remarks AS '备注', ctime AS '创立时间'
          FROM t_device
          WHERE ${queryFields.where}
          ORDER BY id`,
@@ -38,9 +38,9 @@ module.exports = async function getDeviceManageList(query) {
         // 如果默认匹配没有结果，再尝试更宽松的排序规则。
         const fallbackFields = buildDeviceQuery(searchMode, keywordLike, true)
         ;[deviceData] = await promisePool.query(
-            `SELECT id, device_name AS '鐠佹儳顦崥宥囆?,
-                    remarks AS '婢跺洦鏁?,
-                    number AS '閻絻婧呯紓鏍у娇id', ctime AS '閸掓稑缂撻弮鍫曟？'
+            `SELECT id, device_name AS '设备名称',
+                    remarks AS '备注',
+                    number AS '设备编号', ctime AS '创立时间'
              FROM t_device
              WHERE ${fallbackFields.where}
              ORDER BY id`,

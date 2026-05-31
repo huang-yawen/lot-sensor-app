@@ -36,14 +36,14 @@ module.exports = async function getHistoryDataByType(query) {
         fieldUnit[item.db_name] = item.unit
     })
 
-    const searchMapper = ['id', 'd_no AS 璁惧缂栧彿']
+    const searchMapper = ['id', 'd_no AS 设备编号']
     for (const key in fieldMapping) {
         searchMapper.push(`${key} AS \`${fieldMapping[key]}\``)
     }
     if (type === 'behavior') {
-        searchMapper.push('field5 AS 閲囬泦鏃堕棿')
+        searchMapper.push('field5 AS 采集时间')
     }
-    searchMapper.push('c_time AS 鍒涚珛鏃堕棿')
+    searchMapper.push('c_time AS 创立时间')
 
     const sql = `
         SELECT ${searchMapper.join(',')}

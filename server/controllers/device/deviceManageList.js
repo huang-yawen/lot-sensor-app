@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
         res.status(500).json({
             success: false,
             message: '设备列表查询失败',
-            error: err.message
+            error: err.message,
         })
     }
 }

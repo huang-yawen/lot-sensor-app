@@ -45,16 +45,7 @@ export const paginationStore = defineStore("paginationStore", () => {
 
         paginationData.value = paginationData.value.map((item) => ({
           ...item,
-          创立时间: item["创立时间"]
-            ? new Date(item["创立时间"]).toLocaleString("zh-CN", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              })
-            : "未知时间",
+          创立时间: item["创立时间"] || "未知时间",
         }))
       }
     } catch (error) {

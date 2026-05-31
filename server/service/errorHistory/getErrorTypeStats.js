@@ -7,10 +7,10 @@ module.exports = async function getErrorTypeStats(query) {
     const params = keyword ? [`%${keyword}%`, `%${keyword}%`] : []
 
     const [rows] = await promisePool.query(
-        `SELECT 
-            CASE 
-                WHEN type IS NULL OR type = '' OR TRIM(type) = '' OR type = 'undefined' THEN '鏈煡鏁呴殰'
-                ELSE type 
+        `SELECT
+            CASE
+                WHEN type IS NULL OR type = '' OR TRIM(type) = '' OR type = 'undefined' THEN '未知故障'
+                ELSE type
             END AS type,
             COUNT(*) AS count
          FROM t_error_msg

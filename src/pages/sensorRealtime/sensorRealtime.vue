@@ -72,9 +72,9 @@ const loading = ref(false)
 const selectedValue = ref("")
 const hideDeviceSelector = computed(() => shouldHideField("设备编号ID", visibility))
 
-const data=computed(()=>store.sensorData?.proccessData)
+const data = computed(() => store.sensorData?.processedData || store.sensorData?.proccessData)
 const sourceList = computed(() => {
-  const val = store.sensorData?.proccessData
+  const val = store.sensorData?.processedData || store.sensorData?.proccessData
   return Array.isArray(val) ? val : []
 })
 
@@ -109,15 +109,7 @@ const filteredDataList = computed(() => {
 
 const formatValue = (key, value) => {
   if (key === "创立时间" && value) {
-    return new Date(value).toLocaleString("zh-CN", {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false   
-    })
+    return value;
   }
   return String(value ?? "")
 }

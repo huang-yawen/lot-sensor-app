@@ -28,16 +28,7 @@ export const errMsgStore = defineStore("errMsgStore", () => {
 
         errData.value = list.map((item) => ({
           ...item,
-          报错时间: item["报错时间"]
-            ? new Date(item["报错时间"]).toLocaleString("zh-CN", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              })
-            : "未知时间",
+          报错时间: item["报错时间"] || "未知时间",
         }))
 
         total.value = res.data?.total || list.length

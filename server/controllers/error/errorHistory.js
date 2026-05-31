@@ -6,7 +6,7 @@ module.exports = async (req, res) => {
         const payload = await getErrorHistory(req.query)
         res.json(payload)
     } catch (err) {
-        console.error('err表查询出错:', err)
+        console.error('错误历史查询出错:', err)
         res.status(500).json({
             success: false,
             message: '错误数据查询失败',

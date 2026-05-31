@@ -37,7 +37,7 @@ module.exports = async function getErrorHistory(query) {
     const { whereClause, params } = buildWhere(query)
 
     const [rows] = await promisePool.query(
-        `SELECT id, d_no AS '璁惧缂栧彿', e_msg AS '鏁呴殰淇℃伅', c_time AS '鎶ラ敊鏃堕棿', type AS '鏁呴殰绫诲瀷'
+        `SELECT id, d_no AS '设备编号', e_msg AS '故障信息', c_time AS '报警时间', type AS '故障类型'
          FROM t_error_msg
          ${whereClause}
          ORDER BY c_time DESC
