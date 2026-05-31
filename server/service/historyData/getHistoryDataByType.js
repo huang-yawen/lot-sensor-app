@@ -1,6 +1,19 @@
 const promisePool = require('../../config/promisepool')
 const { formatDataWithUnit, buildDisplayFieldUnits } = require('../../utils/helper')
 
+const isValidDateTime = (dateStr) => {
+    if (!dateStr) return true
+    const regex = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/
+    return regex.test(dateStr)
+}
+
+const validateDateRange = (startTime, endTime) => {
+    if (!startTime || !endTime) return true
+    const start = new Date(startTime)
+    const end = new Date(endTime)
+    return start <= end
+}
+
 // 查询传感器或行为历史数据，并返回格式化后的列表和字段信息。
 module.exports = async function getHistoryDataByType(query) {
     const type = query.type || 'sensor'
@@ -21,8 +34,19 @@ module.exports = async function getHistoryDataByType(query) {
     const offset = (page - 1) * pageSize
     const keyword = query.keyword || null
     const keywordLike = keyword ? `%${keyword}%` : null
-    const startTime = query.startTime || null
-    const endTime = query.endTime || null
+    
+    let startTime = query.startTime || null
+    let endTime = query.endTime || null
+    
+    if (startTime && !isValidDateTime(startTime)) {
+        throw new Error('开始时间格式不正确，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS')
+    }
+    if (endTime && !isValidDateTime(endTime)) {
+        throw new Error('结束时间格式不正确，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS')
+    }
+    if (!validateDateRange(startTime, endTime)) {
+        throw new Error('开始时间不能大于结束时间')
+    }
 
     // 让前端字段名和数据库字段映射保持同步。
     const [fieldMapper] = await promisePool.query(
@@ -40,9 +64,9 @@ module.exports = async function getHistoryDataByType(query) {
     for (const key in fieldMapping) {
         searchMapper.push(`${key} AS \`${fieldMapping[key]}\``)
     }
-    if (type === 'behavior') {
-        searchMapper.push('field5 AS 采集时间')
-    }
+    // if (type === 'behavior') {
+    //     searchMapper.push('field5 AS 采集时间')
+    // }如果要有采集时间
     searchMapper.push('c_time AS 创立时间')
 
     const sql = `
@@ -53,7 +77,7 @@ module.exports = async function getHistoryDataByType(query) {
           AND (? IS NULL OR c_time <= ?)
           AND (? IS NULL OR id = ? OR d_no LIKE ?)
           AND (? IS NULL OR online = ?)
-        ORDER BY c_time DESC
+        ORDER BY id DESC
         LIMIT ? OFFSET ?
     `
 

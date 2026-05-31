@@ -10,16 +10,17 @@ async function saveBehaviorData(info) {
         info.fan ?? null,
         info.fan_speed ?? null,
         info.air ?? null,
+        info.acmode ?? null,
         info.air_power ?? null,
         info.led ?? null,
         info.led_power ?? null,
-        info.c_time ?? null,
+        info.Time ?? null,
         info.online ?? null,
     ]
 
     try {
         await promisePool.execute(
-            `INSERT INTO t_behavior_data (d_no, field1, field2, field3, field4, field5, field6, field7, c_time, online) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO t_behavior_data (d_no, field1, field2, field3, field4, field5, field6, field7, field8, c_time, online) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             params
         )
         console.log('[BehaviorRealtime] Data saved to database successfully')

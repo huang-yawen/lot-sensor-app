@@ -43,7 +43,7 @@ module.exports = async (req, res) => {
 
         // 顺手把故障数据、行为数据也拼到同一个返回里，方便首页一次渲染。
         const [errorMapper] = await promisePool.query(
-            'SELECT id, d_no AS `设备编号`, c_time AS `更新时间`, e_msg AS `故障原因` FROM t_error_msg'
+            'SELECT id, d_no AS `设备编号`, c_time AS `创立时间`, e_msg AS `故障原因` FROM t_error_msg'
         )
 
         const sortedData = errorMapper.reduce((acc, item) => {
@@ -66,10 +66,10 @@ module.exports = async (req, res) => {
             searchBehavior.push(`${key} AS \`${fieldName[key]}\``)
         })
         searchBehavior.push('online AS 数据类型')
-        searchBehavior.push('field5 AS 更新时间')
+        searchBehavior.push('c_time AS 更新时间')
 
         let [behaviorOutcome] = await promisePool.query(
-            `SELECT ${searchBehavior.join(',')} FROM t_behavior_data`
+            `SELECT ${searchBehavior.join(',')} FROM t_behavior_data ORDER BY id desc`
         )
         behaviorOutcome = behaviorOutcome.map((item) => {
             for (const key in fieldName) {

@@ -27,7 +27,7 @@ module.exports = async function getDeviceManageList(query) {
     const queryFields = buildDeviceQuery(searchMode, keywordLike)
     let [deviceData] = await promisePool.query(
         `SELECT id, number AS '设备编号', device_name AS '设备名称',
-                remarks AS '备注', ctime AS '创立时间'
+                remarks AS '备注', ctime AS '创建时间'
          FROM t_device
          WHERE ${queryFields.where}
          ORDER BY id`,
@@ -40,7 +40,7 @@ module.exports = async function getDeviceManageList(query) {
         ;[deviceData] = await promisePool.query(
             `SELECT id, device_name AS '设备名称',
                     remarks AS '备注',
-                    number AS '设备编号', ctime AS '创立时间'
+                    number AS '设备编号', ctime AS '创建时间'
              FROM t_device
              WHERE ${fallbackFields.where}
              ORDER BY id`,

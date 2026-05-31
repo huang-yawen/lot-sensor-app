@@ -232,13 +232,10 @@ const submitForm = async () => {
   if (!validateForm(form)) return
 
   if (showAdd.value) {
-    const now = new Date();
-    const pad = n => n.toString().padStart(2, '0');
-    const formattedTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     const payload = {
       ...form,
       id: Number(form.id),
-      创立时间: formattedTime,
+      创立时间: new Date().toLocaleString("zh-CN", { hour12: false }),
     }
     const res = await store.handleAdd(payload)
     if (res.data?.success) {

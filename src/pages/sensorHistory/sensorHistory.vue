@@ -19,18 +19,28 @@
 
       <view class="filter-row">
         <text class="label">开始日期</text>
-        <picker mode="date" :value="startDate" @change="onStartDateChange">
+        <picker mode="date" :value="startDatePart" @change="onStartDatePartChange">
           <view class="picker-value">
-            <text>{{ startDate || "请选择开始日期" }}</text>
+            <text>{{ startDatePart || '请选择' }}</text>
+          </view>
+        </picker>
+        <picker mode="time" :value="startTimePart" @change="onStartTimePartChange">
+          <view class="picker-value">
+            <text>{{ startTimePart || '请选择' }}</text>
           </view>
         </picker>
       </view>
 
       <view class="filter-row">
         <text class="label">结束日期</text>
-        <picker mode="date" :value="endDate" @change="onEndDateChange">
+        <picker mode="date" :value="endDatePart" @change="onEndDatePartChange">
           <view class="picker-value">
-            <text>{{ endDate || "请选择结束日期" }}</text>
+            <text>{{ endDatePart || '请选择' }}</text>
+          </view>
+        </picker>
+        <picker mode="time" :value="endTimePart" @change="onEndTimePartChange">
+          <view class="picker-value">
+            <text>{{ endTimePart || '请选择' }}</text>
           </view>
         </picker>
       </view>
@@ -97,8 +107,25 @@ const store = paginationStore()
 const visibility = displayStore()
 const keyword = ref("")
 const hideDeviceSelector = computed(() => shouldHideField("设备编号ID", visibility))
-const startDate = ref("")
-const endDate = ref("")
+
+const startDatePart = ref("")
+const startTimePart = ref("")
+const endDatePart = ref("")
+const endTimePart = ref("")
+
+const startDate = computed(() => {
+  if (!startDatePart.value || !startTimePart.value) return ""
+  return `${startDatePart.value} ${startTimePart.value}`
+})
+const endDate = computed(() => {
+  if (!endDatePart.value || !endTimePart.value) return ""
+  return `${endDatePart.value} ${endTimePart.value}`
+})
+
+const validateDateRange = () => {
+  if (!startDate.value || !endDate.value) return true
+  return new Date(startDate.value) <= new Date(endDate.value)
+}
 
 const data=computed(()=>store.paginationData.slice(0,5))
 const pageSize=computed(()=>store.pageSize||5)
@@ -130,13 +157,22 @@ const fetchList = async (page = 1) => {
 }
 
 const handleSearch = async (page = 1) => {
+  if (!validateDateRange()) {
+    uni.showToast({
+      title: '开始时间不能大于结束时间',
+      icon: 'none'
+    })
+    return
+  }
   await fetchList(page)
 }
 
 const resetSearch = async () => {
   keyword.value = ""
-  startDate.value = ""
-  endDate.value = ""
+  startDatePart.value = ""
+  startTimePart.value = ""
+  endDatePart.value = ""
+  endTimePart.value = ""
   await fetchList(1)
 }
 
@@ -150,12 +186,20 @@ const nextPage = async () => {
   await fetchList(Number(store.currentPage) + 1)
 }
 
-const onStartDateChange = (event) => {
-  startDate.value = event.detail.value
+const onStartDatePartChange = (event) => {
+  startDatePart.value = event.detail.value
 }
 
-const onEndDateChange = (event) => {
-  endDate.value = event.detail.value
+const onStartTimePartChange = (event) => {
+  startTimePart.value = event.detail.value
+}
+
+const onEndDatePartChange = (event) => {
+  endDatePart.value = event.detail.value
+}
+
+const onEndTimePartChange = (event) => {
+  endTimePart.value = event.detail.value
 }
 
 const renderText = (val) => {

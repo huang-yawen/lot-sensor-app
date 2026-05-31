@@ -13,7 +13,8 @@ const pool = mysql.createPool({
   queueLimit: 0,
   charset: 'utf8mb4',
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 0,
+  dateStrings: true// 开启日期字符串解析,把日期当成一般的字符串进行返回
 })
 const promisePool = pool.promise()
 module.exports = promisePool;

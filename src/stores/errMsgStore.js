@@ -7,6 +7,14 @@ export const errMsgStore = defineStore("errMsgStore", () => {
   const total = ref(0)
   const loading = ref(false)
 
+  const formatTimeForBackend = (time) => {
+    if (!time) return undefined
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(time)) {
+      return `${time}:00`
+    }
+    return time
+  }
+
   const fetchErrData = async (params = {}) => {
     loading.value = true
     try {
@@ -15,6 +23,8 @@ export const errMsgStore = defineStore("errMsgStore", () => {
           page: params.currentPage || 1,
           keyword: params.keyword || "",
           pageSize: params.pageSize || 5,
+          startTime: formatTimeForBackend(params.startTime),
+          endTime: formatTimeForBackend(params.endTime),
         },
         headers: {
           "Cache-Control": "no-cache",

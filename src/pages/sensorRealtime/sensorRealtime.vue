@@ -109,7 +109,15 @@ const filteredDataList = computed(() => {
 
 const formatValue = (key, value) => {
   if (key === "创立时间" && value) {
-    return value;
+    return new Date(value).toLocaleString("zh-CN", {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false   
+    })
   }
   return String(value ?? "")
 }

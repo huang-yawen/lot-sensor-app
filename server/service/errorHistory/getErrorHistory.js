@@ -1,11 +1,34 @@
 const promisePool = require('../../config/promisepool')
 
+const isValidDateTime = (dateStr) => {
+    if (!dateStr) return true
+    const regex = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/
+    return regex.test(dateStr)
+}
+
+const validateDateRange = (startTime, endTime) => {
+    if (!startTime || !endTime) return true
+    const start = new Date(startTime)
+    const end = new Date(endTime)
+    return start <= end
+}
+
 const buildWhere = (query) => {
     const keyword = query.keyword?.trim() || ''
-    const startTime = query.startTime || ''
-    const endTime = query.endTime || ''
+    let startTime = query.startTime || ''
+    let endTime = query.endTime || ''
     const conditions = []
     const params = []
+
+    if (startTime && !isValidDateTime(startTime)) {
+        throw new Error('开始时间格式不正确，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS')
+    }
+    if (endTime && !isValidDateTime(endTime)) {
+        throw new Error('结束时间格式不正确，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS')
+    }
+    if (!validateDateRange(startTime, endTime)) {
+        throw new Error('开始时间不能大于结束时间')
+    }
 
     // 只为用户实际传入的筛选条件拼接 SQL 片段。
     if (keyword) {
