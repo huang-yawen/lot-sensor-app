@@ -19,8 +19,7 @@ module.exports = async (req, res) => {
         })
 
         const searchMapper = ['id', 'd_no AS 设备编号']
-        searchMapper.push('pid1 AS 物体编号1')
-        searchMapper.push('pid2 AS 物体编号2')
+        searchMapper.push('pid AS 物体编号')
         for (const key in fieldMapping) {
             searchMapper.push(`${key} AS \`${fieldMapping[key]}\``)
         }

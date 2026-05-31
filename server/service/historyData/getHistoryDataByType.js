@@ -3,8 +3,16 @@ const { formatDataWithUnit, buildDisplayFieldUnits } = require('../../utils/help
 
 const isValidDateTime = (dateStr) => {
     if (!dateStr) return true
-    const regex = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/
+    const regex = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}(:\d{2})?)?$/
     return regex.test(dateStr)
+}
+
+const formatDateTime = (dateStr) => {
+    if (!dateStr) return null
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(dateStr)) {
+        return `${dateStr}:00`
+    }
+    return dateStr
 }
 
 const validateDateRange = (startTime, endTime) => {
@@ -35,8 +43,8 @@ module.exports = async function getHistoryDataByType(query) {
     const keyword = query.keyword || null
     const keywordLike = keyword ? `%${keyword}%` : null
     
-    let startTime = query.startTime || null
-    let endTime = query.endTime || null
+    let startTime = formatDateTime(query.startTime) || null
+    let endTime = formatDateTime(query.endTime) || null
     
     if (startTime && !isValidDateTime(startTime)) {
         throw new Error('开始时间格式不正确，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS')

@@ -11,14 +11,6 @@ export const paginationStore = defineStore("paginationStore", () => {
   const loading = ref(false)
   const type = ref("数据监测中心")
 
-  const formatTimeForBackend = (time) => {
-    if (!time) return undefined
-    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(time)) {
-      return `${time}:00`
-    }
-    return time
-  }
-
   const fetchPaginationData = async (params = {}) => {
     loading.value = true
     try {
@@ -27,8 +19,8 @@ export const paginationStore = defineStore("paginationStore", () => {
           type: params.type || "sensor",
           page: params.currentPage || currentPage.value,
           keyword: params.keyword || "",
-          startTime: formatTimeForBackend(params.startTime),
-          endTime: formatTimeForBackend(params.endTime),
+          startTime: params.startTime,
+          endTime: params.endTime,
           pageSize: params.pageSize ? Number(params.pageSize) : pageSize.value,
         },
         headers: {
@@ -50,32 +42,6 @@ export const paginationStore = defineStore("paginationStore", () => {
         } else if (response.data.data.type) {
           type.value = response.data.data.type
         }
-
-        const safeParseDate = (dateStr) => {
-      if (!dateStr) return null
-      const safeStr = dateStr.replace(/-/g, '/').replace('T', ' ')
-      const date = new Date(safeStr)
-      return isNaN(date.getTime()) ? null : date
-    }
-
-    const formatDateTime = (date) => {
-      if (!date) return "未知时间"
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      const seconds = String(date.getSeconds()).padStart(2, '0')
-      return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`
-    }
-
-    paginationData.value = paginationData.value.map((item) => {
-      const date = safeParseDate(item["创立时间"])
-      return {
-        ...item,
-        创立时间: formatDateTime(date),
-      }
-    })
       }
     } catch (error) {
       console.error("请求失败:", error)

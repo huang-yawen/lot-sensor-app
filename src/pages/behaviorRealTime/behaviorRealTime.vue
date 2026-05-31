@@ -46,7 +46,7 @@
       >
         <view class="row" v-for="[key, value] in visibleEntries(item, visibility)" :key="key">
           <text class="key">{{ key }}：</text>
-          <text class="value">{{ renderText(value) }}</text>
+          <text class="value">{{ key.includes('开关') ? (value === 0 || value === '0' ? '关' : '开') : renderText(value) }}</text>
         </view>
       </view>
     </scroll-view>

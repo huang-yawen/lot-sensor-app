@@ -36,11 +36,12 @@ export const errMsgStore = defineStore("errMsgStore", () => {
       if (res.success) {
         const list = res.data?.list || []
 
-        errData.value = list.map((item) => ({
-          ...item,
-          报错时间: item["报错时间"] || "未知时间",
-        }))
-
+        // errData.value = list.map((item) => ({
+        //   ...item,
+        //   报错时间: item["报错时间"] || "未知时间",
+        // }))
+        //报警时间和报错时间，第一次只包括了一个报错时间所以注释掉一个
+        errData.value = list
         total.value = res.data?.total || list.length
       }
     } catch (error) {

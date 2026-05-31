@@ -1,37 +1,53 @@
 const promisePool = require('../../config/promisepool')
 
-const WARNING_FIELDS = [
-    'humi_warn',
-    'smog_warn',
-    'fan_warn',
-    'air_warn',
-    'outage_overtime'
-]
+const WARNING_FIELD_MAP = {
+    'humi_warn': '湿度',
+    'smog_warn': '烟雾',
+    'fan_warn': '风机',
+    'air_warn': '空调',
+    'outage_overtime': '断电超时'
+}
 
-function buildErrorMessage(info) {
+function buildErrorMessageAndType(info) {
     if (info.e_msg) {
-        return String(info.e_msg)
+        return {
+            e_msg: String(info.e_msg),
+            type: info.type ?? null
+        }
     }
 
-    const warnings = WARNING_FIELDS
-        .filter(key => info[key] != null && info[key] !== '')
-        .map(key => `${key}:${info[key]}`)
+    const messages = []
+    const types = []
 
-    if (warnings.length > 0) {
-        return warnings.join('; ')
+    for (const [field, name] of Object.entries(WARNING_FIELD_MAP)) {
+        const value = info[field]
+        if (value != null && value !== '') {
+            const isAbnormal = value === 1 || value === '1'
+            messages.push(`${name}${isAbnormal ? '异常' : '无异常'}`)
+            if (isAbnormal) {
+                types.push(`${name}异常`)
+            }
+        }
     }
 
-    return JSON.stringify(info)
+    return {
+        e_msg: messages.length > 0 ? messages.join('，') : JSON.stringify(info),
+        type: types.length > 0 ? types.join('，') : null
+    }
 }
 
 async function saveErrorMsg(info) {
     // Build a concise error message when the device does not provide one.
+// {"humi_warn":"0","fan_warn":"0","Time":"2026-05-22 10:52:53","online":"1"}
+// 湿度超标，风机异常
+    const { e_msg, type } = buildErrorMessageAndType(info)
+    
     const params = [
-        info.VID ?? info.d_no ?? info.DNO ?? null,
-        info.c_time ?? null,
-        buildErrorMessage(info),
+        '202177',
+        info.Time ?? null,
+        e_msg,
         info.e_no ?? info.error_no ?? null,
-        info.type ?? null,
+        type,
     ]
 
     try {

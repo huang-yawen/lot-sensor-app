@@ -83,61 +83,50 @@ const updateChart = (source) => {
       return
     }
 
-    const formatDate = (date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      const seconds = String(date.getSeconds()).padStart(2, '0');
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    };
+    const isTimeFormat = (value) => {
+      if (!value) return false
+      const str = String(value).trim()
+      return /^\d{4}[-/]\d{2}[-/]\d{2} \d{2}:\d{2}:\d{2}$/.test(str)
+    }
 
-    const safeParseDate = (dateStr) => {
-      if (!dateStr) return null;
-      const safeStr = dateStr.replace(/-/g, '/').replace('T', ' ');
-      const date = new Date(safeStr);
-      return isNaN(date.getTime()) ? null : date;
-    };
+    const findTimeValue = (item) => {
+      for (const key of Object.keys(item)) {
+        if (isTimeFormat(item[key])) {
+          return item[key]
+        }
+      }
+      return null
+    }
 
     const times = json.map(item => {
-      const rawTime = item['创立时间'] || item['采集时间'] || item['创建时间'] || item['更新时间'];
-      console.log(rawTime);
+      const rawTime = findTimeValue(item)
       
-      if (!rawTime || rawTime === '未知时间') {
-        return '未知';
+      if (!rawTime) return '未知'
+      
+      let timeStr = String(rawTime).trim()
+      
+      if (timeStr === '未知时间' || timeStr === '未知') {
+        return '未知'
       }
 
-      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rawTime)) {
-        return rawTime;
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timeStr)) {
+        return timeStr
       }
 
-      if (/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/.test(rawTime)) {
-        return rawTime.replace(/\//g, '-');
+      if (/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/.test(timeStr)) {
+        return timeStr.replace(/\//g, '-')
       }
 
-      if (/^\d{4}\/\d{1,2}\/\d{1,2} \d{1,2}:\d{2}:\d{2}$/.test(rawTime)) {
-        const parts = rawTime.split(' ');
-        const dateParts = parts[0].split('/');
-        const timeParts = parts[1].split(':');
-        return `${dateParts[0]}-${String(dateParts[1]).padStart(2, '0')}-${String(dateParts[2]).padStart(2, '0')} ${String(timeParts[0]).padStart(2, '0')}:${timeParts[1]}:${timeParts[2]}`;
-      }
-
-      let formattedTime = rawTime.replace('T', ' ').replace(/\..+/, '').replace('Z', '');
-
-      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(formattedTime)) {
-        return formattedTime;
-      }
-
-      const parsedDate = safeParseDate(rawTime);
-      if (parsedDate) {
-        return formatDate(parsedDate);
-      }
-
-      return '未知';
+      return '未知'
     }).reverse();
     const elemKeys = Object.keys(json[0])
-    const exclude = ['id', '设备编号', '数据类型', '创建时间', '采集时间',"物体编号1","物体编号2","创立时间","风扇开关","空调开关","可调灯开关","控制模式","空调模式"]
+    const exclude = [
+        'id', '设备编号', '数据类型', '创建时间', '采集时间', '物体编号', '物体编号2', 
+        '创立时间', '风扇开关', '空调开关', '可调灯开关', '控制模式', '空调模式',
+        '更新时间', '时间', 'timestamp', 'time', 'createTime', 'updateTime', 
+        'collectTime', 'recordTime', 'reportTime', 'dataTime', 'datetime', 'dateTime',
+        '上报时间', '记录时间', '数据时间', '检测时间', '采样时间'
+      ]
     const fields = elemKeys.filter(k => !exclude.includes(k))
 
     const series = fields.map(field => ({
