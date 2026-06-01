@@ -64,7 +64,7 @@
       <view class="data-card" v-for="(item, index) in dataList" :key="index">
         <view class="row" v-for="[key, value] in visibleEntries(item, visibility)" :key="key">
           <text class="key">{{ key }}：</text>
-          <text class="value">{{ key.includes('开关') ? (value === 0 || value === '0' ? '关' : '开') : renderText(value) }}</text>
+          <text class="value">{{ transformValue(key, value) }}</text>
         </view>
       </view>
     </scroll-view>
@@ -199,8 +199,25 @@ const onEndTimePartChange = (event) => {
   endTimePart.value = event.detail.value
 }
 
-const renderText = (val) => {
+const transformValue = (key, val) => {
   if (val === null || val === undefined) return ""
+  
+  const numVal = Number(val)
+  const isZero = numVal === 0 || val === "0"
+  const isOne = numVal === 1 || val === "1"
+  
+  if (key.includes("开关")) {
+    return isZero ? "关" : isOne ? "开" : String(val)
+  }
+  
+  if (key.includes("控制模式")) {
+    return isZero ? "手动" : isOne ? "自动" : String(val)
+  }
+  
+  if (key.includes("空调模式")) {
+    return isZero ? "制冷" : isOne ? "制热" : String(val)
+  }
+  
   return String(val)
 }
 

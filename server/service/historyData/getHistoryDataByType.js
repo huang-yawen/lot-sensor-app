@@ -68,7 +68,7 @@ module.exports = async function getHistoryDataByType(query) {
         fieldUnit[item.db_name] = item.unit
     })
 
-    const searchMapper = ['id', 'd_no AS 设备编号']
+    const searchMapper = ['id', 'd_no as 储运箱ID']
     for (const key in fieldMapping) {
         searchMapper.push(`${key} AS \`${fieldMapping[key]}\``)
     }

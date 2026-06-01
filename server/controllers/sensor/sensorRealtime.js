@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
             fieldUnit[item.db_name] = item.unit
         })
 
-        const searchMapper = ['id', 'd_no AS 设备编号']
+        const searchMapper = ['id', 'd_no AS 储运箱ID']
         searchMapper.push('pid AS 物体编号')
         for (const key in fieldMapping) {
             searchMapper.push(`${key} AS \`${fieldMapping[key]}\``)
@@ -42,11 +42,11 @@ module.exports = async (req, res) => {
 
         // 顺手把故障数据、行为数据也拼到同一个返回里，方便首页一次渲染。
         const [errorMapper] = await promisePool.query(
-            'SELECT id, d_no AS `设备编号`, c_time AS `创立时间`, e_msg AS `故障原因` FROM t_error_msg'
+            'SELECT id, d_no AS `储运箱ID`, c_time AS `创立时间`, e_msg AS `故障原因` FROM t_error_msg'
         )
 
         const sortedData = errorMapper.reduce((acc, item) => {
-            const deviceNo = item['设备编号']
+            const deviceNo = item['储运箱ID']
             if (!acc[deviceNo]) acc[deviceNo] = []
             acc[deviceNo].push(item)
             return acc
@@ -60,7 +60,7 @@ module.exports = async (req, res) => {
             fieldName[item.db_name] = item.p_name
         })
 
-        const searchBehavior = ['id', 'd_no AS 设备编号']
+        const searchBehavior = ['id', 'd_no AS 储运箱ID']
         Object.keys(fieldName).forEach((key) => {
             searchBehavior.push(`${key} AS \`${fieldName[key]}\``)
         })

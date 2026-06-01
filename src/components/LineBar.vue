@@ -125,7 +125,7 @@ const updateChart = (source) => {
         '创立时间', '风扇开关', '空调开关', '可调灯开关', '控制模式', '空调模式',
         '更新时间', '时间', 'timestamp', 'time', 'createTime', 'updateTime', 
         'collectTime', 'recordTime', 'reportTime', 'dataTime', 'datetime', 'dateTime',
-        '上报时间', '记录时间', '数据时间', '检测时间', '采样时间'
+        '上报时间', '记录时间', '数据时间', '检测时间', '采样时间','储运箱ID'
       ]
     const fields = elemKeys.filter(k => !exclude.includes(k))
 
@@ -192,7 +192,8 @@ const updateChart = (source) => {
       xAxis: {
         type: 'category',
         data: times,
-        axisLabel: { rotate: 25, fontSize: 10, interval: 0 }
+        right: '0',
+        axisLabel: { rotate: 25, fontSize: 10, interval: 'auto', padding: [25, 0, 0, 0] }
       },
       yAxis: {
         type: 'value',

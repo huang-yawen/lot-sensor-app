@@ -1,6 +1,6 @@
 const normalizeFieldName = (field) => String(field ?? "").toLowerCase()
 
-export const isIdField = (field) => normalizeFieldName(field).includes("id")
+export const isIdField = (field) => normalizeFieldName(field)=="id"
 
 export const isNumberField = (field) => String(field ?? "").includes("编号")
 

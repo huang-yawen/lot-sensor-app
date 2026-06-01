@@ -1,53 +1,41 @@
 const promisePool = require('../../config/promisepool')
 
-const WARNING_FIELD_MAP = {
-    'humi_warn': '湿度',
-    'smog_warn': '烟雾',
-    'fan_warn': '风机',
-    'air_warn': '空调',
-    'outage_overtime': '断电超时'
+const WARNING_FIELDS = {
+    humi_warn: '湿度',
+    smog_warn: '烟雾',
+    fan_warn: '风机',
+    air_warn: '空调',
+    outage_overtime: '电源'
 }
 
-function buildErrorMessageAndType(info) {
-    if (info.e_msg) {
-        return {
-            e_msg: String(info.e_msg),
-            type: info.type ?? null
-        }
-    }
-
-    const messages = []
+function buildErrorType(info) {
     const types = []
-
-    for (const [field, name] of Object.entries(WARNING_FIELD_MAP)) {
-        const value = info[field]
-        if (value != null && value !== '') {
-            const isAbnormal = value === 1 || value === '1'
-            messages.push(`${name}${isAbnormal ? '异常' : '无异常'}`)
-            if (isAbnormal) {
-                types.push(`${name}异常`)
-            }
+    for (const [key, label] of Object.entries(WARNING_FIELDS)) {
+        if (info[key] == 1) {
+            types.push(label+'异常')
         }
     }
+    return types.join(',')
+}
 
-    return {
-        e_msg: messages.length > 0 ? messages.join('，') : JSON.stringify(info),
-        type: types.length > 0 ? types.join('，') : null
+function buildErrorMessage(info) {
+    const messages = []
+    for (const [key, label] of Object.entries(WARNING_FIELDS)) {
+        const value = info[key]
+        if (value != null && value !== '') {
+            messages.push(value == 1 ? label+'异常' : `${label}正常`)
+        }
     }
+    return messages.join('，')
 }
 
 async function saveErrorMsg(info) {
-    // Build a concise error message when the device does not provide one.
-// {"humi_warn":"0","fan_warn":"0","Time":"2026-05-22 10:52:53","online":"1"}
-// 湿度超标，风机异常
-    const { e_msg, type } = buildErrorMessageAndType(info)
-    
     const params = [
         '202177',
         info.Time ?? null,
-        e_msg,
+        buildErrorMessage(info),
         info.e_no ?? info.error_no ?? null,
-        type,
+        buildErrorType(info),
     ]
 
     try {

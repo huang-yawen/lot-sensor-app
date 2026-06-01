@@ -63,7 +63,7 @@ module.exports = async function getErrorHistory(query) {
         `SELECT id, d_no AS '设备编号', e_msg AS '故障信息', c_time AS '报警时间', type AS '故障类型'
          FROM t_error_msg
          ${whereClause}
-         ORDER BY c_time DESC
+         ORDER BY id DESC
          LIMIT ? OFFSET ?`,
         [...params, pageSize, offset]
     )
