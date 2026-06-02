@@ -57,7 +57,7 @@
       <text>加载中...</text>
     </view>
     <view class="state" v-else-if="!dataList.length">
-      <text>暂无错误数据</text>
+      <text>暂无错误数据</text>     
     </view>
 
     <scroll-view class="list" scroll-y="true" v-else>
