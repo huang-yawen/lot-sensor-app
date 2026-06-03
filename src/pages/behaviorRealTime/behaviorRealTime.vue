@@ -118,6 +118,7 @@ const reloadData = async () => {
       type: "behavior",
       currentPage: 1,
       pageSize: 20,
+      online: "实时数据",
     })
     initSelected()
   } finally {

@@ -22,6 +22,7 @@ export const paginationStore = defineStore("paginationStore", () => {
           startTime: params.startTime,
           endTime: params.endTime,
           pageSize: params.pageSize ? Number(params.pageSize) : pageSize.value,
+          online: params.online || "保留数据",
         },
         headers: {
           "Cache-Control": "no-cache",

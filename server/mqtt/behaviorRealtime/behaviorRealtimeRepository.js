@@ -15,7 +15,7 @@ async function saveBehaviorData(info) {
         info.led ?? null,
         info.led_power ?? null,
         info.Time ?? null,
-        info.online === 0 ? '实时数据' : '保存数据',
+       (String(info.online).trim() === '1' || info.online === true) ? '实时数据' : '保留数据'
     ]
 
     try {
