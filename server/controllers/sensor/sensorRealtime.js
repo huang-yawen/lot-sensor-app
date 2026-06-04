@@ -24,6 +24,7 @@ module.exports = async (req, res) => {
             searchMapper.push(`${key} AS \`${fieldMapping[key]}\``)
         }
         searchMapper.push('c_time AS 创立时间')
+        searchMapper.push('online AS 数据类型')
 
         let whereClause = ''
         let params = []

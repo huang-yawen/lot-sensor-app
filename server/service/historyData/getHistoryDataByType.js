@@ -69,6 +69,9 @@ module.exports = async function getHistoryDataByType(query) {
     })
 
     const searchMapper = ['id', 'd_no as 储运箱ID']
+    if(dataTable=='t_sensor_data'){
+        searchMapper.push('pid as 物体编号')
+    }
     for (const key in fieldMapping) {
         searchMapper.push(`${key} AS \`${fieldMapping[key]}\``)
     }
@@ -76,6 +79,7 @@ module.exports = async function getHistoryDataByType(query) {
     //     searchMapper.push('field5 AS 采集时间')
     // }如果要有采集时间
     searchMapper.push('c_time AS 创立时间')
+    searchMapper.push('online AS 数据类型')
 
     const sql = `
         SELECT ${searchMapper.join(',')}

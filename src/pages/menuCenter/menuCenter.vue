@@ -39,7 +39,7 @@
 		  >设备状态监测记录</navigator
 		>
 	</view>
-    <view class="group settings-group">
+    <view class="group settings-group" style="visibility:hidden;">
       <text class="group-title">显示设置</text>
       <button
         class="setting-btn"

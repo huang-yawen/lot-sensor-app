@@ -6,7 +6,7 @@
     </view>
 
     <view class="filter-card">
-      <view class="filter-row">
+      <!-- <view class="filter-row">
         <text class="label">设备编号</text>
         <input
           class="input"
@@ -15,7 +15,7 @@
           confirm-type="search"
           @confirm="handleSearch(1)"
         />
-      </view>
+      </view> -->
 
       <view class="filter-row">
         <text class="label">开始日期</text>

@@ -17,7 +17,7 @@
       </view>
     </view>
 
-    <view class="picker-row" v-if="options.length && !hideDeviceSelector">
+    <!-- <view class="picker-row" v-if="options.length && !hideDeviceSelector">
       <text class="picker-label">设备编号</text>
       <picker
         class="picker"
@@ -31,7 +31,7 @@
           <text>{{ selectedLabel }}</text>
         </view>
       </picker>
-    </view>
+    </view> -->
 
     <view class="empty" v-if="!loading && !filteredDataList.length">
       <text>暂无数据</text>
