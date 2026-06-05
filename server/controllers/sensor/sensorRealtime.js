@@ -64,7 +64,7 @@ module.exports = async (req, res) => {
         const searchBehavior = ['id', 'd_no AS 储运箱ID']
         Object.keys(fieldName).forEach((key) => {
             searchBehavior.push(`${key} AS \`${fieldName[key]}\``)
-        })
+        })      
         searchBehavior.push('online AS 数据类型')
         searchBehavior.push('c_time AS 更新时间')
 
