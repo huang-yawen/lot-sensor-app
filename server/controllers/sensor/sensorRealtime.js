@@ -57,7 +57,7 @@ module.exports = async (req, res) => {
         const [behaviorField] = await promisePool.query(
             'SELECT db_name, p_name FROM t_behavior_field_mapper'
         )
-        behaviorField.forEach((item) => {
+        behaviorField.forEach((item) => {      
             fieldName[item.db_name] = item.p_name
         })
 
