@@ -18,7 +18,7 @@ export const errMsgStore = defineStore("errMsgStore", () => {
   const fetchErrData = async (params = {}) => {
     loading.value = true
     try {
-      const response = await get("http://localhost:3000/errData", {
+      const response = await get("/errData", {
         data: {
           page: params.currentPage || 1,
           keyword: params.keyword || "",

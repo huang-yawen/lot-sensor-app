@@ -5,13 +5,13 @@ import { get, post } from "../utils/request"
 export const deviceStore = defineStore("deviceStore", () => {
   const deviceData = ref([])
   const loading = ref(false)
-  const total = ref(5)
+  const total = ref(0)
   const ids = ref([])
 
   const fetchDeviceData = async (params = {}) => {
     loading.value = true
     try {
-      const response = await get("http://localhost:3000/deviceData", {
+      const response = await get("/deviceData", {
         data: {
           currentPage: params.currentPage || 1,
           pageSize: params.pageSize || 5,
@@ -28,7 +28,7 @@ export const deviceStore = defineStore("deviceStore", () => {
         const rawIds = []
 
         fullList.forEach((item) => {
-          rawIds.push(item["电车编号id"])
+          rawIds.push(item["设备编号"])
           if (item["创建时间"]) {
             try {
               item["创建时间"] = new Date(item["创建时间"]).toLocaleString(
@@ -50,6 +50,12 @@ export const deviceStore = defineStore("deviceStore", () => {
 
         ids.value = [...new Set(rawIds)]
         deviceData.value = fullList
+        total.value = response.data.data.total || 0
+      } else {
+        // 请求失败时清空旧数据，避免残留
+        deviceData.value = []
+        total.value = 0
+        ids.value = []
       }
     } finally {
       loading.value = false
@@ -57,15 +63,15 @@ export const deviceStore = defineStore("deviceStore", () => {
   }
 
   const handleDelete = async (id) => {
-    return await post("http://localhost:3000/deviceData/delete", { id })
+    return await post("/deviceData/delete", { id })
   }
 
   const handleAdd = async (item) => {
-    return await post("http://localhost:3000/deviceData/add", item)
+    return await post("/deviceData/add", item)
   }
 
   const handleUpdate = async (item) => {
-    return await post("http://localhost:3000/deviceData/update", item)
+    return await post("/deviceData/update", item)
   }
 
   return {

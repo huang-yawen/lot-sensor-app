@@ -78,7 +78,13 @@ const updateChart = (source) => {
   if (!mychart) return
   try {
     const json = source?.slice(0, props.pageSize) || []
-    if (json.length === 0) {
+    if (!json || json.length === 0) {
+      mychart.clear()
+      return
+    }
+
+    const firstItem = json[0]
+    if (!firstItem || typeof firstItem !== 'object') {
       mychart.clear()
       return
     }

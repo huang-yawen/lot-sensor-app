@@ -33,8 +33,12 @@ class MqttClient extends EventEmitter {
         this.config = config           // 保存配置
         this.isConnected = false       // 连接状态标志
         this.messageQueue = []         // 离线消息队列（连接恢复后发送）
-        this.deviceLastAlive = new Map() // 设备最后活跃时间映射
+        this.deviceLastAlive = {} // 设备最后活跃时间映射
+        this.devicePendingCommands = {} // 设备离线时暂存的指令队列 { d_no: [{config_id, value}] }
+        this.deviceOfflineStatus = {}   // 设备离线状态 { d_no: boolean }
+        this.deviceOfflineTimers = {}   // 设备离线防抖定时器 { d_no: timerId }
         this.client = this.createClient() // 创建MQTT客户端实例
+        console.log('[MqttClient] 初始化完成，设备离线检测使用每个设备独立的防抖定时器（10秒）')
     }
 
     /**
@@ -92,10 +96,13 @@ class MqttClient extends EventEmitter {
             // 规范化主题名称，移除开头的斜杠
             const normalizedTopic = topic.replace(/^\/+/, '')
 
-            // 心跳消息处理：仅更新设备活跃时间戳，不做其他处理
-            if (normalizedTopic.startsWith('isAlive/')) {
-                const id = normalizedTopic.split('/').pop()
-                this.markDeviceAlive(id)
+            // 心跳消息处理：从 heart_beat 主题提取设备编号，更新设备活跃时间戳
+            if (normalizedTopic === 'heart_beat') {
+                // 消息内容就是设备编号（字符串）
+                const id = payload.toString().trim()
+                if (id) {
+                    this.markDeviceAlive(id)
+                }
                 return
             }
 
@@ -108,25 +115,18 @@ class MqttClient extends EventEmitter {
                 return
             }
 
-            // 根据主题路由到对应的消息处理器
-            // 传感器数据主题
+            // 根据主题路由到对应的消息处理器（使用 else-if 链确保单一匹配）
             if (topic === SENSOR_TOPIC) {
                 const result = await handleSensorData(topic, payload)
                 if (result) {
                     this.emit('message', topic, result)
                 }
-            }
-
-            // 行为数据主题
-            if (topic === BEHAVIOR_TOPIC) {
+            } else if (topic === BEHAVIOR_TOPIC) {
                 const result = await handleBehaviorData(topic, payload)
                 if (result) {
                     this.emit('message', topic, result)
                 }
-            }
-
-            // 错误数据主题
-            if (topic === ERROR_TOPIC) {
+            } else if (topic === ERROR_TOPIC) {
                 const result = await handleErrorData(topic, payload)
                 if (result) {
                     this.emit('message', topic, result)
@@ -171,7 +171,7 @@ class MqttClient extends EventEmitter {
 
     /**
      * 向指定设备发布JSON格式消息
-     * 支持离线消息队列和消息重发机制（非心跳消息发送两次）
+     * 支持离线消息队列和消息重发机制（每条消息发送两次提高可靠性）
      * @param {string} deviceId - 设备ID
      * @param {string} topic - 消息主题
      * @param {Object} payload - 消息内容（对象形式）
@@ -204,23 +204,15 @@ class MqttClient extends EventEmitter {
             })
         }
 
-        // 判断是否为心跳消息
-        const isHeartbeat = finalTopic.startsWith('isAlive/')
-        // 心跳消息发送1次，其他消息发送2次（提高可靠性）
-        const shouldPublishTwice = !isHeartbeat
-
-        if (shouldPublishTwice) {
-            await publishOnce()
-            console.log(`[MQTT] Publishing topic second time for device ${deviceId}: ${finalTopic}`)
-            return publishOnce()
-        }
-
+        // 每条消息发送2次提高可靠性
+        await publishOnce()
+        console.log(`[MQTT] Publishing topic second time for device ${deviceId}: ${finalTopic}`)
         return publishOnce()
     }
 
     /**
      * 通用消息发布方法
-     * 支持离线消息队列和消息重发机制（非心跳消息发送两次）
+     * 支持离线消息队列和消息重发机制（每条消息发送两次提高可靠性）
      * @param {string} topic - 消息主题
      * @param {string|Buffer} payload - 消息内容
      * @param {Object} options - 发布选项
@@ -251,27 +243,15 @@ class MqttClient extends EventEmitter {
                 })
             }
 
-            // 判断是否为心跳消息
-            const isHeartbeat = topic.startsWith('isAlive/')
-            // 心跳消息发送1次，其他消息发送2次（提高可靠性）
-            const shouldPublishTwice = !isHeartbeat
-
-            if (shouldPublishTwice) {
-                publishOnce().then(() => {
-                    console.log(`[MQTT] Publishing topic second time: ${topic}`)
-                    return publishOnce()
-                }).then(() => {
-                    resolve({ status: 'published', times: 2 })
-                }).catch((err) => {
-                    reject(err)
-                })
-            } else {
-                publishOnce().then(() => {
-                    resolve({ status: 'published', times: 1 })
-                }).catch((err) => {
-                    reject(err)
-                })
-            }
+            // 每条消息发送2次提高可靠性
+            publishOnce().then(() => {
+                console.log(`[MQTT] Publishing topic second time: ${topic}`)
+                return publishOnce()
+            }).then(() => {
+                resolve({ status: 'published', times: 2 })
+            }).catch((err) => {
+                reject(err)
+            })
         })
     }
 
@@ -292,30 +272,159 @@ class MqttClient extends EventEmitter {
 
     /**
      * 更新设备最后活跃时间戳
+     * 每次收到心跳时重置该设备的离线防抖定时器（10秒后标记离线）
+     * 当设备从离线变为在线时，自动发送暂存的指令
      * @param {string} id - 设备ID
      */
     markDeviceAlive(id) {
-        this.deviceLastAlive.set(id, Date.now())
+        const finalDeviceId = this.normalizeDeviceId(id)
+        if (!finalDeviceId) return
+        
+        const wasOffline = this.deviceOfflineStatus[finalDeviceId] === true
+        this.deviceLastAlive[finalDeviceId] = Date.now()
+        this.deviceOfflineStatus[finalDeviceId] = false
+        
+        // 重置该设备的离线防抖定时器
+        if (this.deviceOfflineTimers[finalDeviceId]) {
+            clearTimeout(this.deviceOfflineTimers[finalDeviceId])
+        }
+        this.deviceOfflineTimers[finalDeviceId] = setTimeout(() => {
+            // 10秒内没收到新心跳，标记离线
+            this.deviceOfflineStatus[finalDeviceId] = true
+            console.log(`[Heartbeat] 设备 ${finalDeviceId} 已离线（超过10秒未收到心跳）`)
+            this.emit('deviceOffline', finalDeviceId)
+            delete this.deviceOfflineTimers[finalDeviceId]
+        }, 10000)
+        
+        // 如果设备之前是离线状态，现在上线了，发送暂存指令
+        if (wasOffline) {
+            console.log(`[Heartbeat] 设备 ${finalDeviceId} 上线，检查暂存指令...`)
+            this.flushPendingCommands(finalDeviceId)
+        }
     }
 
     /**
      * 检查设备是否在线
-     * 设备30秒内有心跳则认为在线
+     * 设备10秒内有心跳则认为在线
      * @param {string} id - 设备ID
      * @returns {boolean} 设备是否在线
      */
     checkIfAlive(id) {
         const finalDeviceId = this.normalizeDeviceId(id)
-        const lastAlive = this.deviceLastAlive.get(finalDeviceId)
+        if (!finalDeviceId) return false
+        const lastAlive = this.deviceLastAlive[finalDeviceId]
         const now = Date.now()
-        // 判断是否在30秒内有活跃记录
-        const isAlive = lastAlive && (now - lastAlive) < 30000
+        // 判断是否在10秒内有活跃记录
+        const isAlive = lastAlive && (now - lastAlive) < 10000
 
         if (!isAlive) {
             console.log(`Device ${finalDeviceId} is offline`)
         }
 
         return isAlive
+    }
+
+    /**
+     * 启动离线检测定时器（已废弃，改用每个设备独立的防抖定时器）
+     * 保留空方法避免调用处报错
+     */
+    startOfflineDetection() {
+        // 已改用 markDeviceAlive 中的防抖定时器
+    }
+
+    /**
+     * 为设备添加暂存指令（设备离线时调用）
+     * @param {string} d_no - 设备编号
+     * @param {number} config_id - 指令配置ID
+     * @param {*} value - 指令值
+     */
+    addPendingCommand(d_no, config_id, value) {
+        if (!d_no || d_no === 'null') return
+        
+        if (!this.devicePendingCommands[d_no]) {
+            this.devicePendingCommands[d_no] = []
+        }
+        
+        this.devicePendingCommands[d_no].push({ config_id, value })
+        console.log(`[PendingCommands] 设备 ${d_no} 离线，指令 config_id=${config_id} 已暂存（当前队列长度: ${this.devicePendingCommands[d_no].length}）`)
+    }
+
+    /**
+     * 发送设备所有暂存指令
+     * 设备上线时调用，发送所有暂存指令 + 当前时间校准
+     * @param {string} d_no - 设备编号
+     */
+    async flushPendingCommands(d_no) {
+        if (!d_no || d_no === 'null') return
+        
+        const commands = this.devicePendingCommands[d_no]
+        if (!commands || commands.length === 0) {
+            console.log(`[PendingCommands] 设备 ${d_no} 无暂存指令需要发送`)
+            return
+        }
+        
+        console.log(`[PendingCommands] 设备 ${d_no} 上线，开始发送 ${commands.length} 条暂存指令`)
+        
+        // 1. 先发送当前时间校准（格式与手动校准一致：{"set": "YYYY-MM-DD-W HH:mm:ss"}）
+        const now = new Date()
+        const bjOffset = 8 * 60
+        const localOffset = now.getTimezoneOffset()
+        const bjTime = new Date(now.getTime() + (bjOffset + localOffset) * 60000)
+        
+        const weeks = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+        const y = String(bjTime.getFullYear())
+        const m = String(bjTime.getMonth() + 1).padStart(2, '0')
+        const day = String(bjTime.getDate()).padStart(2, '0')
+        const w = weeks[bjTime.getDay()]
+        const h = String(bjTime.getHours()).padStart(2, '0')
+        const min = String(bjTime.getMinutes()).padStart(2, '0')
+        const s = String(bjTime.getSeconds()).padStart(2, '0')
+        
+        // 周索引：weeks.indexOf(w)
+        const weekIdx = weeks.indexOf(w)
+        const timeStr = `${y}-${m}-${day}-${weekIdx} ${h}:${min}:${s}`
+        const calibratePayload = { set: timeStr }
+        
+        try {
+            await this.publishJsonToDevice(d_no, 'control', calibratePayload, { qos: 1 })
+            console.log(`[PendingCommands] 设备 ${d_no} 时间校准已发送:`, calibratePayload)
+        } catch (err) {
+            console.error(`[PendingCommands] 设备 ${d_no} 时间校准发送失败:`, err.message)
+        }
+        
+        // 2. 发送所有暂存指令
+        for (const cmd of commands) {
+            try {
+                // 根据 config_id 获取对应的属性名
+                const configIdMapping = {
+                    0: 'mode', 1: 'air', 2: 'fan', 3: 'speed_fan', 4: 'acMode',
+                    5: 'power_air', 6: 'TG', 7: 'TinDH', 8: 'TinDL', 9: 'led',
+                    10: 'LXD', 11: 'bright_led', 12: 'TBegin', 13: 'TEnd', 14: 'calibrate'
+                }
+                const propertyName = configIdMapping[cmd.config_id] || `unknown_${cmd.config_id}`
+                
+                let payload
+                if (Number(cmd.config_id) === 14) {
+                    // 校准时间特殊处理
+                    try {
+                        payload = typeof cmd.value === 'string' ? JSON.parse(cmd.value) : cmd.value
+                    } catch (e) {
+                        payload = { [propertyName]: cmd.value }
+                    }
+                } else {
+                    payload = { [propertyName]: cmd.value }
+                }
+                
+                await this.publishJsonToDevice(d_no, 'control', payload, { qos: 1 })
+                console.log(`[PendingCommands] 设备 ${d_no} 指令 config_id=${cmd.config_id} 已发送:`, payload)
+            } catch (err) {
+                console.error(`[PendingCommands] 设备 ${d_no} 指令 config_id=${cmd.config_id} 发送失败:`, err.message)
+            }
+        }
+        
+        // 3. 清空该设备的暂存指令队列
+        delete this.devicePendingCommands[d_no]
+        console.log(`[PendingCommands] 设备 ${d_no} 暂存指令已全部发送并清空`)
     }
 
     /**

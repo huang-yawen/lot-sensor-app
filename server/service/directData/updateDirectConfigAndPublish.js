@@ -18,7 +18,8 @@ const configIdMapping = {
    10: 'LXD',     // 光照阈值 (Lux/Illuminance) 
    11: 'bright_led',           // 亮度 (Brightness) 
    12: 'TBegin',                // 时间 (Time) 
-   13: 'TEnd'               // 时间 (Time) 
+   13: 'TEnd',               // 时间 (Time) 
+   14: 'calibrate'          // 校准时间 (Calibration Time)
 }
 
 const SWITCH_TYPES = [0, 1, 2, 4, 9]
@@ -81,8 +82,21 @@ module.exports = async (req, res) => {
             mappedValue
         })
         
-        const payload = {
-            [propertyName]: mappedValue
+        // 校准时间特殊处理：value 是 JSON 字符串如 {"set":"2026-6-9-2 15:41:10"} 或 {"real":"..."}
+        // 直接解析并作为 payload 发送，不包装在 {calibrate: ...} 中
+        let payload
+        if (Number(config_id) === 14) {
+            try {
+                // value 可能已经是对象（如果前端直接传对象），也可能是 JSON 字符串
+                payload = typeof value === 'string' ? JSON.parse(value) : value
+            } catch (e) {
+                console.warn('[Direct Update] 校准时间 JSON 解析失败，使用原始值:', value)
+                payload = { [propertyName]: mappedValue }
+            }
+        } else {
+            payload = {
+                [propertyName]: mappedValue
+            }
         }
 
         console.log('[Direct Update] Publish MQTT:', {
@@ -91,6 +105,28 @@ module.exports = async (req, res) => {
             payload,
             isConnected: mqttClient.isConnected
         })
+
+        // 检查设备是否在线（针对设备专属指令）
+        const deviceId = saveResult.d_no
+        let isDeviceOnline = true
+        if (deviceId && deviceId !== 'null') {
+            isDeviceOnline = mqttClient.checkIfAlive(deviceId)
+        }
+
+        if (!isDeviceOnline) {
+            // 设备离线，将指令暂存到内存队列
+            console.log(`[Direct Update] 设备 ${deviceId} 离线，指令暂存等待上线后发送`)
+            mqttClient.addPendingCommand(deviceId, config_id, mappedValue)
+            
+            return res.json({
+                success: true,
+                message: '配置保存成功，设备离线，指令已暂存，设备上线后自动发送。',
+                data: {
+                    db: saveResult,
+                    mqtt: { status: 'queued', deviceId, reason: 'device_offline' }
+                }
+            })
+        }
 
         try {
             const publishResult = await mqttClient.publishJsonToDevice(

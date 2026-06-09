@@ -123,9 +123,9 @@ import { shouldHideField, visibleEntries } from "../../utils/fieldVisibility"
 const store = deviceStore()
 const visibility = displayStore()
 
-const labels = ["id", "设备名称", "电车编号id", "备注"]
+const labels = ["id", "设备名称", "设备编号", "备注"]
 const visibleLabels = computed(() => labels.filter((label) => !shouldHideField(label, visibility)))
-const hideDeviceSelector = computed(() => shouldHideField("电车编号id", visibility))
+const hideDeviceSelector = computed(() => shouldHideField("设备编号", visibility))
 const keyword = ref("")
 const currentPage = ref(1)
 const pageSize = ref(5)
@@ -145,7 +145,7 @@ const deviceList = computed(() => {
 })
 
 const hasNextPage = computed(() => {
-  return deviceList.value.length >= pageSize.value
+  return currentPage.value * pageSize.value < store.total
 })
 
 const initForm = (target) => {
@@ -185,6 +185,7 @@ const nextPage = async () => {
 const openAdd = () => {
   showEdit.value = false
   showAdd.value = true
+  oldId.value = null
   initForm(formData.value)
 }
 
@@ -209,8 +210,8 @@ const validateForm = (form) => {
     uni.showToast({ title: "设备名称不能为空", icon: "none" })
     return false
   }
-  if (!form["电车编号id"]) {
-    uni.showToast({ title: "电车编号id不能为空", icon: "none" })
+  if (!form["设备编号"]) {
+    uni.showToast({ title: "设备编号不能为空", icon: "none" })
     return false
   }
 
@@ -254,7 +255,7 @@ const submitForm = async () => {
     id: Number(form.id),
     备注: form["备注"] ?? null,
     设备名称: form["设备名称"] ?? "",
-    电车编号id: form["电车编号id"] ?? "",
+    设备编号: form["设备编号"] ?? "",
   }
   const res = await store.handleUpdate(updatePayload)
   if (res.data?.success) {

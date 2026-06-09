@@ -38,7 +38,9 @@ module.exports = async (req, res) => {
             params
         )
 
-        const processedData = formatDataWithUnit(sensorData, fieldMapping, fieldUnit)
+        // 注意：不将单位拼接到数值上，前端图表需要纯数值，列表显示时由前端自行拼接单位
+        // const processedData = formatDataWithUnit(sensorData, fieldMapping, fieldUnit)
+        const processedData = sensorData
         const fieldUnits = buildDisplayFieldUnits(fieldMapping, fieldUnit)
 
         // 顺手把故障数据、行为数据也拼到同一个返回里，方便首页一次渲染。
@@ -71,22 +73,21 @@ module.exports = async (req, res) => {
         let [behaviorOutcome] = await promisePool.query(
             `SELECT ${searchBehavior.join(',')} FROM t_behavior_data ORDER BY id desc`
         )
-        behaviorOutcome = behaviorOutcome.map((item) => {
-            for (const key in fieldName) {
-                const label = fieldName[key]
-                const unit = fieldUnit[key]
-                if (unit) {
-                    item[label] = `${item[label]} ${unit}`
-                }
-            }
-            return item
-        })
+        // behaviorOutcome = behaviorOutcome.map((item) => {
+        //     for (const key in fieldName) {
+        //         const label = fieldName[key]
+        //         const unit = fieldUnit[key]
+        //         if (unit) {
+        //             item[label] = `${item[label]} ${unit}`
+        //         }
+        //     }
+        //     return item
+        // })
 
         res.json({
             success: true,
             message: '成功',
             processedData,
-            proccessData: processedData,
             fieldUnits,
             sortedData,
             behaviorOutcome,

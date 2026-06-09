@@ -12,7 +12,7 @@ const client = new MqttClient({
   subscribeTopics: [
     // Heartbeat, sensor, behavior, error and control topics.
     { topic: 'testTopic/1', qos: 1 },
-    { topic: 'isAlive/#', qos: 1 },
+    { topic: 'heart_beat', qos: 1 },
     { topic: 'sensor_data', qos: 1 },
     { topic: 'behavioral_data', qos: 1 },
     { topic: 'abnormal_state', qos: 1 },
@@ -24,6 +24,5 @@ client.on('message', (topic, info) => {
   console.log('MQTT message received:', topic, info)
 })
 
-client.checkIfAlive(1)
 
 module.exports = client

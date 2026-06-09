@@ -96,10 +96,11 @@
 
 <script setup>
 import { computed, ref } from "vue"
-import { onLoad, onPullDownRefresh } from "@dcloudio/uni-app"
+import { onLoad, onPullDownRefresh, onUnload } from "@dcloudio/uni-app"
 import { paginationStore } from "../../stores/paginationStore"
 import { displayStore } from "../../stores/displayStore"
 import { shouldHideField, visibleEntries } from "../../utils/fieldVisibility"
+import { connect as wsConnect, on as wsOn, close as wsClose } from "../../utils/websocket"
 import LineBar from "../../components/LineBar.vue"
 const store = paginationStore()
 const visibility = displayStore()
@@ -221,13 +222,36 @@ const transformValue = (key, val) => {
   return String(val)
 }
 
+let wsUnsubscribe = null
+
 onLoad(async () => {
   await fetchList(1)
+
+  // 连接 WebSocket，接收行为数据实时推送
+  wsConnect({
+    onMessage: (data) => {
+      if (data.type === 'behavior_data') {
+        fetchList(Number(store.currentPage || 1))
+      }
+    }
+  })
+
+  wsUnsubscribe = wsOn('behavior_data', () => {
+    fetchList(Number(store.currentPage || 1))
+  })
 })
 
 onPullDownRefresh(async () => {
   await fetchList(Number(store.currentPage || 1))
   uni.stopPullDownRefresh()
+})
+
+onUnload(() => {
+  if (wsUnsubscribe) {
+    wsUnsubscribe()
+    wsUnsubscribe = null
+  }
+  wsClose()
 })
 </script>
 

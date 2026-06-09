@@ -53,7 +53,7 @@
         </view>
       </view>
     </scroll-view>
-	<view class="chart-section">
+    <view class="chart-section" v-if="data && Array.isArray(data) && data.length">
 	  <LineBar :data="data" :fieldUnits="store.fieldUnits" />
 	</view>
   </view>
@@ -61,20 +61,22 @@
 
 <script setup>
 import { computed, ref } from "vue"
-import { onLoad, onPullDownRefresh } from "@dcloudio/uni-app"
+import { onLoad, onPullDownRefresh, onUnload } from "@dcloudio/uni-app"
 import { sensorStore } from "../../stores/sensorStore"
 import { displayStore } from "../../stores/displayStore"
 import { shouldHideField, visibleEntries } from "../../utils/fieldVisibility"
+import { connect as wsConnect, on as wsOn, close as wsClose } from "../../utils/websocket"
 import LineBar from '../../components/LineBar.vue'
 const store = sensorStore()
 const visibility = displayStore()
 const loading = ref(false)
 const selectedValue = ref("")
 const hideDeviceSelector = computed(() => shouldHideField("设备编号ID", visibility))
+let wsUnsubscribe = null
 
-const data = computed(() => store.sensorData?.processedData || store.sensorData?.proccessData)
+const data = computed(() => store.sensorData?.processedData)
 const sourceList = computed(() => {
-  const val = store.sensorData?.processedData || store.sensorData?.proccessData
+  const val = store.sensorData?.processedData
   return Array.isArray(val) ? val : []
 })
 
@@ -102,9 +104,12 @@ const selectedLabel = computed(() => {
 
 const filteredDataList = computed(() => {
   if (!sourceList.value.length) return []
-  const firstKey = Object.keys(sourceList.value[0])[0]
-  const selected = selectedValue.value || sourceList.value[0][firstKey]
-  return sourceList.value.filter((item) => item[firstKey] === selected)
+  const firstItem = sourceList.value[0]
+  if (!firstItem || typeof firstItem !== 'object') return []
+  const firstKey = Object.keys(firstItem)[0]
+  if (!firstKey) return []
+  const selected = selectedValue.value || firstItem[firstKey]
+  return sourceList.value.filter((item) => item && item[firstKey] === selected)
 })
 
 const formatValue = (key, value) => {
@@ -118,6 +123,11 @@ const formatValue = (key, value) => {
       second: '2-digit',
       hour12: false   
     })
+  }
+  // 根据 fieldUnits 自动拼接单位（后端不再拼接单位到数值上）
+  const unit = store.fieldUnits?.[key]
+  if (unit && value !== null && value !== undefined && value !== '') {
+    return `${value} ${unit}`
   }
   return String(value ?? "")
 }
@@ -152,10 +162,34 @@ const onPickChange = (event) => {
 
 onLoad(async () => {
   await reloadData()
+
+  // 连接 WebSocket，接收实时推送
+  wsConnect({
+    onMessage: (data) => {
+      // 收到 sensor_data 类型消息时自动刷新
+      if (data.type === 'sensor_data') {
+        reloadData()
+      }
+    }
+  })
+
+  // 也可以通过事件监听方式注册
+  wsUnsubscribe = wsOn('sensor_data', () => {
+    reloadData()
+  })
 })
 
 onPullDownRefresh(async () => {
   await reloadData()
+})
+
+// 页面卸载时断开 WebSocket 连接
+onUnload(() => {
+  if (wsUnsubscribe) {
+    wsUnsubscribe()
+    wsUnsubscribe = null
+  }
+  wsClose()
 })
 
 </script>

@@ -66,13 +66,6 @@
 import { displayStore } from "../../stores/displayStore"
 
 const visibility = displayStore()
-
-const list = [
-  { 创立时间: '2024-01-01 10:00', 温度: '23℃', 湿度: '50%' },
-  { 创立时间: '2024-01-01 11:00', 温度: '25℃', 湿度: '55%' },
-  { 创立时间: '2024-01-01 12:00', 温度: '28℃', 湿度: '60%' }
-]
-
 </script>
 <style>
 .page {

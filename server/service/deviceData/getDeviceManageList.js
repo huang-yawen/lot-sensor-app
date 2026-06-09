@@ -24,14 +24,29 @@ module.exports = async function getDeviceManageList(query) {
     const searchMode = query.searchMode || 'all'
     const keywordLike = `%${input}%`
 
+    // 分页参数
+    const currentPage = Math.max(1, parseInt(query.currentPage, 10) || 1)
+    const pageSize = Math.max(1, parseInt(query.pageSize, 10) || 5)
+    const offset = (currentPage - 1) * pageSize
+
     const queryFields = buildDeviceQuery(searchMode, keywordLike)
+
+    // 先查总数
+    const [[{ total }]] = await promisePool.query(
+        `SELECT COUNT(*) AS total
+         FROM t_device
+         WHERE ${queryFields.where}`,
+        queryFields.params
+    )
+
     let [deviceData] = await promisePool.query(
         `SELECT id, number AS '设备编号', device_name AS '设备名称',
                 remarks AS '备注', ctime AS '创建时间'
          FROM t_device
          WHERE ${queryFields.where}
-         ORDER BY id`,
-        queryFields.params
+         ORDER BY id
+         LIMIT ? OFFSET ?`,
+        [...queryFields.params, pageSize, offset]
     )
 
     if ((!deviceData || deviceData.length === 0) && /\D/.test(input)) {
@@ -43,8 +58,9 @@ module.exports = async function getDeviceManageList(query) {
                     number AS '设备编号', ctime AS '创建时间'
              FROM t_device
              WHERE ${fallbackFields.where}
-             ORDER BY id`,
-            fallbackFields.params
+             ORDER BY id
+             LIMIT ? OFFSET ?`,
+            [...fallbackFields.params, pageSize, offset]
         )
     }
 
@@ -64,13 +80,13 @@ module.exports = async function getDeviceManageList(query) {
         }
     }
 
-    const total = Array.isArray(deviceData) ? deviceData.length : 0
-
     const responsePayload = {
         success: true,
         data: {
             list: deviceData,
             total,
+            currentPage,
+            pageSize,
         },
     }
 

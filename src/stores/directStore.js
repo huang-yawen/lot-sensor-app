@@ -8,7 +8,7 @@ export const directStore = defineStore("directStore", () => {
 
   const fetchDirectData = async () => {
     try {
-      const res = await get("http://localhost:3000/directData")
+      const res = await get("/directData")
       if (res.data.success) {
         data.value = res.data.data
       }
@@ -19,7 +19,7 @@ export const directStore = defineStore("directStore", () => {
 
   const handleRender = async (d_no = "null") => {
     try {
-      const response = await get("http://localhost:3000/directRender", {
+      const response = await get("/directRender", {
         data: { d_no },
       })
 
@@ -41,7 +41,7 @@ export const directStore = defineStore("directStore", () => {
         value,
         d_no,
       }
-      const response = await post("http://localhost:3000/directData/update", payload)
+      const response = await post("/directData/update", payload)
       return response
     } catch (err) {
       console.error("[Store] handleUpdateData 更新失败:", err)

@@ -185,6 +185,7 @@ INSERT INTO `t_direct_config` VALUES (7, 0, 'on', '温差', '2', NULL, NULL, '10
 INSERT INTO `t_direct_config` VALUES (9, 0, 'on', '温度下限阈值', '2', NULL, NULL, NULL, NULL, '9', 'direct', NULL, NULL);
 INSERT INTO `t_direct_config` VALUES (10, 0, 'on', '温度上限阈值', '2', NULL, NULL, NULL, NULL, '10', 'direct', NULL, NULL);
 INSERT INTO `t_direct_config` VALUES (11, 0, 'on', '光照阈值', '2', NULL, NULL, 'null', 'null', '11', 'direct', NULL, NULL);
+INSERT INTO `t_direct_config` VALUES (14, 0, 'off&on', '校准时间', '6', NULL, NULL, NULL, NULL, '14', 'direct', NULL, NULL);
 
 -- ----------------------------
 -- Table structure for t_error_msg

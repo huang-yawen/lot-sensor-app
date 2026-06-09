@@ -66,11 +66,24 @@ export const request = async (config = {}) => {
   if (finalConfig.withLoading) uni.showLoading({ title: finalConfig.loadingTitle, mask: true })
 
   try {
-    // 【关键修复】：不再使用 [err, res] 解构，兼容所有平台
+    // 【关键修复】：GET 请求将 data 拼接到 URL 查询参数，确保后端能通过 req.query 获取
+    let requestUrl = finalConfig.url
+    if ((finalConfig.method === 'GET' || finalConfig.method === 'DELETE') && finalConfig.data) {
+      const queryParts = []
+      for (const [key, value] of Object.entries(finalConfig.data)) {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        }
+      }
+      if (queryParts.length) {
+        requestUrl += (requestUrl.includes('?') ? '&' : '?') + queryParts.join('&')
+      }
+    }
+
     const response = await uni.request({
-      url: finalConfig.url,
+      url: requestUrl,
       method: finalConfig.method,
-      data: finalConfig.data,
+      data: finalConfig.method === 'GET' || finalConfig.method === 'DELETE' ? undefined : finalConfig.data,
       header: finalConfig.header,
       timeout: finalConfig.timeout
     })

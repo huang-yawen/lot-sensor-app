@@ -14,7 +14,7 @@ export const paginationStore = defineStore("paginationStore", () => {
   const fetchPaginationData = async (params = {}) => {
     loading.value = true
     try {
-      const response = await get("http://localhost:3000/dataByType", {
+      const response = await get("/dataByType", {
         data: {
           type: params.type || "sensor",
           page: params.currentPage || currentPage.value,

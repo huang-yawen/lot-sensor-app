@@ -9,7 +9,7 @@ export const sensorStore = defineStore("sensorStore", () => {
   const sensorValue = () => sensorData.value
 
   const fetchData = async () => {
-    const response = await get("http://localhost:3000/data", {
+    const response = await get("/data", {
       data: {
         online: "实时数据"
       }
