@@ -1,0 +1,200 @@
+/**
+ * 设备管理器
+ * 
+ * 职责：
+ * 1. 跟踪设备在线/离线状态（基于心跳）
+ * 2. 设备离线时暂存指令，上线后自动发送
+ * 3. 设备上线时自动发送时间校准
+ * 
+ * 使用方式：
+ *   const deviceManager = new DeviceManager(mqttClient)
+ *   deviceManager.onHeartbeat('device001')  // 收到心跳时调用
+ *   deviceManager.isOnline('device001')     // 检查设备是否在线
+ *   deviceManager.addPendingCommand('device001', config_id, value)  // 暂存指令
+ */
+
+const configIdMapping = {
+  0: 'mode', 1: 'air', 2: 'fan', 3: 'speed_fan', 4: 'acMode',
+  5: 'power_air', 6: 'TG', 7: 'TinDH', 8: 'TinDL', 9: 'led',
+  10: 'LXD', 11: 'bright_led', 12: 'TBegin', 13: 'TEnd', 14: 'calibrate'
+}
+
+/** 设备离线超时时间（毫秒） */
+const OFFLINE_TIMEOUT = 10000
+
+class DeviceManager {
+  /**
+   * @param {Object} mqttClient - MqttClient 实例，用于发送指令
+   */
+  constructor(mqttClient) {
+    this.mqttClient = mqttClient
+
+    /** @type {Map<string, number>} 设备最后心跳时间戳 */
+    this._lastHeartbeat = new Map()
+
+    /** @type {Map<string, boolean>} 设备在线状态 */
+    this._onlineStatus = new Map()
+
+    /** @type {Map<string, NodeJS.Timeout>} 离线检测定时器 */
+    this._offlineTimers = new Map()
+
+    /** @type {Map<string, Array<{config_id: number, value: any}>>} 暂存指令队列 */
+    this._pendingCommands = new Map()
+  }
+
+  // ==================== 心跳与在线状态 ====================
+
+  /**
+   * 收到设备心跳时调用
+   * @param {string} deviceId - 设备编号
+   */
+  onHeartbeat(deviceId) {
+    if (!deviceId) return
+
+    const wasOffline = !this._onlineStatus.get(deviceId)
+    const now = Date.now()
+
+    // 更新心跳时间和在线状态
+    this._lastHeartbeat.set(deviceId, now)
+    this._onlineStatus.set(deviceId, true)
+
+    // 重置离线检测定时器
+    this._resetOfflineTimer(deviceId)
+
+    // 设备从离线变为在线 -> 发送暂存指令和时间校准
+    if (wasOffline) {
+      console.log(`[DeviceManager] 设备 ${deviceId} 上线`)
+      this._sendTimeCalibration(deviceId)
+      this._flushPendingCommands(deviceId)
+    }
+  }
+
+  /** 重置设备的离线检测定时器 */
+  _resetOfflineTimer(deviceId) {
+    if (this._offlineTimers.has(deviceId)) {
+      clearTimeout(this._offlineTimers.get(deviceId))
+    }
+    this._offlineTimers.set(deviceId, setTimeout(() => {
+      this._onlineStatus.set(deviceId, false)
+      console.log(`[DeviceManager] 设备 ${deviceId} 离线（${OFFLINE_TIMEOUT/1000}秒无心跳）`)
+      this._offlineTimers.delete(deviceId)
+    }, OFFLINE_TIMEOUT))
+  }
+
+  /**
+   * 检查设备是否在线
+   * @param {string} deviceId
+   * @returns {boolean}
+   */
+  isOnline(deviceId) {
+    return this._onlineStatus.get(deviceId) === true
+  }
+
+  // ==================== 暂存指令 ====================
+
+  /**
+   * 设备离线时暂存指令，上线后自动发送
+   * @param {string} deviceId
+   * @param {number} configId
+   * @param {*} value
+   */
+  addPendingCommand(deviceId, configId, value) {
+    if (!deviceId || deviceId === 'null') return
+
+    if (!this._pendingCommands.has(deviceId)) {
+      this._pendingCommands.set(deviceId, [])
+    }
+    this._pendingCommands.get(deviceId).push({ config_id: configId, value })
+    console.log(`[DeviceManager] 设备 ${deviceId} 指令暂存 (config_id=${configId})`)
+  }
+
+  /** 设备上线时发送所有暂存指令 */
+  async _flushPendingCommands(deviceId) {
+    const commands = this._pendingCommands.get(deviceId)
+    if (!commands || commands.length === 0) return
+
+    console.log(`[DeviceManager] 设备 ${deviceId} 上线，发送 ${commands.length} 条暂存指令`)
+    for (const cmd of commands) {
+      const payload = this._buildPayload(cmd.config_id, cmd.value)
+      if (payload) {
+        try {
+          await this.mqttClient.publish('control', payload)
+        } catch (err) {
+          console.error(`[DeviceManager] 暂存指令发送失败:`, err.message)
+        }
+      }
+    }
+    this._pendingCommands.delete(deviceId)
+  }
+
+  // ==================== 时间校准 ====================
+
+  /** 设备上线时发送当前北京时间校准 */
+  async _sendTimeCalibration(deviceId) {
+    const now = new Date()
+    const bjOffset = 8 * 60
+    const localOffset = now.getTimezoneOffset()
+    const bjTime = new Date(now.getTime() + (bjOffset + localOffset) * 60000)
+
+    const dayOfWeek = bjTime.getDay() === 0 ? 7 : bjTime.getDay()
+    const y = bjTime.getFullYear()
+    const m = String(bjTime.getMonth() + 1).padStart(2, '0')
+    const d = String(bjTime.getDate()).padStart(2, '0')
+    const h = String(bjTime.getHours()).padStart(2, '0')
+    const min = String(bjTime.getMinutes()).padStart(2, '0')
+    const s = String(bjTime.getSeconds()).padStart(2, '0')
+
+    const timeStr = `${y}-${m}-${d}-${dayOfWeek} ${h}:${min}:${s}`
+    const payload = { real: timeStr }
+
+    try {
+      await this.mqttClient.publish('control', payload)
+      console.log(`[DeviceManager] 设备 ${deviceId} 时间校准已发送`)
+    } catch (err) {
+      console.error(`[DeviceManager] 时间校准发送失败:`, err.message)
+    }
+  }
+
+  // ==================== 工具方法 ====================
+
+  /**
+   * 根据 config_id 和 value 构建 MQTT 消息 payload
+   * @param {number} configId
+   * @param {*} value
+   * @returns {Object|null}
+   */
+  _buildPayload(configId, value) {
+    const propertyName = configIdMapping[configId] || `unknown_${configId}`
+
+    // 校准时间特殊处理
+    if (Number(configId) === 14) {
+      try {
+        return typeof value === 'string' ? JSON.parse(value) : value
+      } catch {
+        return { [propertyName]: value }
+      }
+    }
+
+    // 开关类型值映射
+    const SWITCH_TYPES = [0, 1, 2, 4, 9]
+    const VALUE_MAP = { on: 'open', off: 'close' }
+    const mappedValue = SWITCH_TYPES.includes(Number(configId)) && VALUE_MAP[value]
+      ? VALUE_MAP[value]
+      : value
+
+    return { [propertyName]: mappedValue }
+  }
+
+  /** 清理所有定时器 */
+  cleanup() {
+    for (const timer of this._offlineTimers.values()) {
+      clearTimeout(timer)
+    }
+    this._offlineTimers.clear()
+    this._lastHeartbeat.clear()
+    this._onlineStatus.clear()
+    this._pendingCommands.clear()
+  }
+}
+
+module.exports = DeviceManager

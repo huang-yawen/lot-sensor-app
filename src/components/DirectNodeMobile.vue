@@ -400,8 +400,9 @@ const onCalibrateSubmit = async () => {
   calSubmitting.value = true
   
   try {
-    // 手动模式：发送用户选择的时间
-    const timeStr = `${calYearVal.value}-${calMonthVal.value}-${calDayVal.value}-${calWeekIdx.value} ${calHourVal.value}:${calMinVal.value}:${calSecVal.value}`
+    // 手动模式：发送用户选择的时间（周：weeks索引0=周日→7，1=周一→1，...6=周六→6）
+    const weekNum = calWeekIdx.value === 0 ? 7 : calWeekIdx.value
+    const timeStr = `${calYearVal.value}-${calMonthVal.value}-${calDayVal.value}-${weekNum} ${calHourVal.value}:${calMinVal.value}:${calSecVal.value}`
     const payload = { set: timeStr }
     
     await props.onUpdate(props.node.id, JSON.stringify(payload), props.targetId)

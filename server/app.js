@@ -92,15 +92,17 @@ function broadcast(type, payload) {
     deadClients.forEach((client) => wsClients.delete(client));
 }
 
-// 监听 MQTT 消息，收到后广播给所有 WebSocket 客户端
-mqttClient.on('message', (topic, info) => {
+// 监听 MQTT 处理后的消息，广播给所有 WebSocket 客户端
+mqttClient.on('processedMessage', (topic, data) => {
     // 根据主题映射消息类型
-    let type = 'unknown';
-    if (topic === 'sensor_data') type = 'sensor_data';
-    else if (topic === 'behavioral_data') type = 'behavior_data';
-    else if (topic === 'abnormal_state') type = 'error_data';
+    const typeMap = {
+        'sensor_data': 'sensor_data',
+        'behavioral_data': 'behavior_data',
+        'abnormal_state': 'error_data'
+    };
+    const type = typeMap[topic] || 'unknown';
 
-    broadcast(type, info);
+    broadcast(type, data);
 });
 
 // 导出 broadcast 函数，供其他模块使用（如控制器需要主动推送时）
