@@ -5,13 +5,12 @@
     <navigator class="jump-link" url="/pages/menuCenter/menuCenter">返回上一级</navigator>
     </view>
 
-    <view class="section-card">
-      <text class="section-title">指令配置</text>
-      <!-- 删去全局因为设备只有一组 -->
+    <!-- ========== 全局指令配置（多设备时取消注释） ========== -->
+    
+    <!-- <view class="section-card">
+      <text class="section-title">全局指令配置</text>
       <view class="state" v-if="loading">加载中...</view>
-      <view class="state" v-else-if="!sourceNodes.length"
-        >暂无指令结构数据</view
-      >
+      <view class="state" v-else-if="!sourceNodes.length">暂无指令结构数据</view>
       <view v-else>
         <DirectNodeMobile
           v-for="node in sourceNodes"
@@ -22,11 +21,13 @@
           :on-update="handleUpdate"
         />
       </view>
-    </view>
+    </view> -->
+   
 
-    <view class="section-card" style="display:none;">
+    <!-- ========== 设备指令配置（单设备/多设备通用） ========== -->
+    <view class="section-card">
       <view class="section-head-row">
-        <text class="section-title">多设备指令配置</text>
+        <text class="section-title">设备指令配置</text>
       </view>
 
       <view class="picker-row" v-if="!hideDevicePicker">
@@ -44,7 +45,7 @@
         </picker>
       </view>
 
-      <view class="state" v-if="!selectedDeviceId">选择设备以配置指令</view>
+      <view class="state" v-if="!selectedDeviceId">请选择设备以配置指令</view>
       <view class="state" v-else-if="loading">加载中...</view>
       <view v-else>
         <DirectNodeMobile
@@ -73,9 +74,20 @@ const direct = directStore()
 const device = deviceStore()
 const visibility = displayStore()
 
+// ============================================================
+// 单设备/多设备模式
+// 从后端 /directRender 接口的 singleDeviceMode 字段获取
+// 修改 server/.env 中的 SINGLE_DEVICE_MODE 即可全局切换
+// ============================================================
 const loading = ref(false)
+const singleDeviceMode = ref(true) // 默认单设备模式，从后端获取后更新
 const selectedDeviceId = ref("")
-const hideDevicePicker = computed(() => shouldHideField("电车编号ID", visibility))
+const hideDevicePicker = computed(() => {
+  // 单设备模式：隐藏下拉框
+  if (singleDeviceMode.value) return true
+  // 多设备模式：根据字段可见性配置决定
+  return shouldHideField("电车编号ID", visibility)
+})
 
 const globalFormData = reactive({})
 const deviceFormData = reactive({})
@@ -133,11 +145,16 @@ const initNode = (node, renderData, targetForm) => {
 }
 
 const initializeForm = async (targetId, targetForm) => {
-  const latestRenderData = await direct.handleRender(targetId)
+  const result = await direct.handleRender(targetId)
+  // 从后端获取单设备模式配置
+  if (result.singleDeviceMode !== undefined) {
+    singleDeviceMode.value = result.singleDeviceMode
+  }
+  const latestRenderData = result.data || []
   clearFormData(targetForm)
 
   sourceNodes.value.forEach((node) => {
-    initNode(node, latestRenderData || [], targetForm)
+    initNode(node, latestRenderData, targetForm)
   })
 }
 
@@ -150,7 +167,12 @@ const initializeBaseData = async () => {
 
 const handleUpdate = async (id, value, targetId = "null") => {
   try {
-    await direct.handleUpdateData({ id, value, d_no: targetId || "null" })
+    // 总是传 d_no，后端根据 SINGLE_DEVICE_MODE 决定是否使用
+    // targetId 为 "null" 字符串时，传 d_no: "null" 表示全局指令
+    // targetId 为设备号时，传 d_no: 设备号
+    const params = { id, value, d_no: targetId || "null" }
+    console.log('[CommandConfig] handleUpdate params:', JSON.stringify(params))
+    await direct.handleUpdateData(params)
   } catch (error) {
     uni.showToast({ title: "保存失败，请稍后重试", icon: "none" })
   }
@@ -174,8 +196,16 @@ const reloadAll = async () => {
   loading.value = true
   try {
     await initializeBaseData()
+
+    // 初始化全局指令表单（多设备模式下使用）
     await initializeForm("null", globalFormData)
 
+    // 单设备模式：自动选中第一个设备
+    if (singleDeviceMode.value && ids.value.length > 0 && !selectedDeviceId.value) {
+      selectedDeviceId.value = ids.value[0]
+    }
+
+    // 如果已有选中的设备，初始化该设备的表单
     if (selectedDeviceId.value) {
       await initializeForm(selectedDeviceId.value, deviceFormData)
     }

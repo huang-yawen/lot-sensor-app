@@ -132,11 +132,14 @@ class DeviceManager {
 
   /**
    * 检查设备是否在线
+   * 基于最后心跳时间判断，不依赖定时器状态
    * @param {string} deviceId
    * @returns {boolean}
    */
   isOnline(deviceId) {
-    return this._onlineStatus.get(deviceId) === true
+    const lastBeat = this._lastHeartbeat.get(deviceId)
+    if (!lastBeat) return false
+    return (Date.now() - lastBeat) < OFFLINE_TIMEOUT
   }
 
   /**
@@ -154,7 +157,7 @@ class DeviceManager {
     for (const [deviceId] of this._onlineStatus) {
       statusList.push({
         deviceId,
-        online: this._onlineStatus.get(deviceId) === true
+        online: this.isOnline(deviceId)
       })
     }
     return statusList

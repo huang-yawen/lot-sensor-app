@@ -25,21 +25,29 @@ export const directStore = defineStore("directStore", () => {
 
       if (response.data.success) {
         renderData.value = response.data.data || []
-        return response.data.data || []
+        return {
+          data: response.data.data || [],
+          singleDeviceMode: response.data.singleDeviceMode,
+        }
       }
-      return []
+      return { data: [], singleDeviceMode: undefined }
     } catch (err) {
       console.error("[Store] handleRender 渲染数据请求失败:", err)
-      return []
+      return { data: [], singleDeviceMode: undefined }
     }
   }
 
-  const handleUpdateData = async ({ id, value, d_no = "null" }) => {
+  const handleUpdateData = async ({ id, value, d_no }) => {
     try {
       const payload = {
         config_id: id,
         value,
-        d_no,
+      }
+      // 只有传了 d_no 才加到 payload 中
+      // 单设备模式：前端不传 d_no，后端自动处理
+      // 多设备模式：前端传 d_no（null=全局指令，设备号=单设备指令）
+      if (d_no !== undefined && d_no !== null) {
+        payload.d_no = d_no
       }
       const response = await post("/directData/update", payload)
       return response

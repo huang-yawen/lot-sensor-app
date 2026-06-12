@@ -9,11 +9,36 @@
  * 使用方式：
  *   POST /api/directData/update
  *   Body: { config_id, value, d_no }
+ * 
+ * 模式说明：
+ *   SINGLE_DEVICE_MODE = true  （单设备模式）
+ *     - 整个系统只有一套设备
+ *     - 前端不传 d_no，后端自动使用默认设备号
+ *     - MQTT 消息中不携带 d_no（不传给底层设备）
+ *     - 仍检查在线状态，离线暂存
+ *   
+ *   SINGLE_DEVICE_MODE = false （多设备模式）
+ *     - 有多套设备
+ *     - 前端传 d_no：null 为全局指令，设备号为单设备指令
+ *     - MQTT 消息中携带 d_no
+ *     - 检查在线状态，离线暂存
  */
 
 const promisePool = require('../../config/dbPool')
 const mqttClient = require('../../mqtt')
 const { saveDirectData } = require('./saveDirectConfig')
+
+// ============================================================
+// 【模式切换变量】SINGLE_DEVICE_MODE
+// ============================================================
+// 从 .env 环境变量读取，修改 server/.env 中的 SINGLE_DEVICE_MODE 即可全局生效
+// true  - 单设备模式（默认）
+// false - 多设备模式
+// ============================================================
+const SINGLE_DEVICE_MODE = process.env.SINGLE_DEVICE_MODE === 'true'
+
+/** 单设备模式下的默认设备编号（从 t_device 表获取的第一个设备） */
+const DEFAULT_DEVICE_ID = null // 将在启动时从数据库加载
 
 /** config_id 到 MQTT 属性名的映射 */
 const CONFIG_MAP = {
@@ -61,6 +86,24 @@ function buildPayload(configId, value) {
  * 
  * 流程：先发消息（或暂存），成功后再保存到数据库
  */
+/**
+ * 获取单设备模式下的默认设备编号
+ * 从 t_device 表查询第一个设备的 number
+ */
+async function getDefaultDeviceId() {
+  try {
+    const [rows] = await promisePool.query(
+      'SELECT `number` FROM `t_device` ORDER BY `id` ASC LIMIT 1'
+    )
+    if (rows && rows.length > 0) {
+      return String(rows[0].number).trim()
+    }
+  } catch (err) {
+    console.error('[DirectUpdate] 查询默认设备编号失败:', err.message)
+  }
+  return null
+}
+
 module.exports = async (req, res) => {
   try {
     const { config_id, value, d_no } = req.body
@@ -70,26 +113,50 @@ module.exports = async (req, res) => {
       return res.status(400).json({ success: false, message: 'config_id 必填' })
     }
 
-    console.log('[DirectUpdate] 收到指令:', { config_id, value, d_no })
+    console.log('[DirectUpdate] 收到指令:', { config_id, value, d_no, mode: SINGLE_DEVICE_MODE ? '单设备' : '多设备' })
 
     // 1. 构建 MQTT 消息
     const payload = buildPayload(config_id, value)
 
-    // 2. 检查设备在线状态
-    const deviceId = d_no && d_no !== 'null' ? d_no : null
-    if (deviceId && !mqttClient.checkIfAlive(deviceId)) {
-      // 设备离线 -> 暂存指令（不保存到数据库，等上线发送成功后再保存）
-      console.log(`[DirectUpdate] 设备 ${deviceId} 离线，指令暂存`)
-      mqttClient.addPendingCommand(deviceId, config_id, value)
+    // 2. 确定目标设备编号
+    let deviceId = null
 
-      return res.json({
-        success: true,
-        message: '设备离线，指令已暂存，将在上线后自动发送并保存',
-        data: { status: 'queued' }
-      })
+    if (SINGLE_DEVICE_MODE) {
+      // ========== 单设备模式 ==========
+      // 从数据库获取默认设备编号
+      deviceId = await getDefaultDeviceId()
+      console.log(`[DirectUpdate] 单设备模式，默认设备编号: ${deviceId}`)
+      // MQTT 消息中不携带 d_no（不传给底层设备）
+    } else {
+      // ========== 多设备模式 ==========
+      deviceId = d_no && d_no !== 'null' && d_no !== 'undefined' ? String(d_no).trim() : null
+      console.log(`[DirectUpdate] 多设备模式，设备编号: ${deviceId}`)
+      // MQTT 消息中携带 d_no（传给底层设备）
+      // 全局指令也传 d_no: null，让底层设备明确知道这是全局指令
+      payload.d_no = deviceId
     }
 
-    // 3. 设备在线 -> 先发送指令（发送两次以确保设备可靠接收）
+    // 3. 检查设备在线状态
+    if (deviceId) {
+      const isAlive = mqttClient.checkIfAlive(deviceId)
+      console.log(`[DirectUpdate] 设备 ${deviceId} 在线状态: ${isAlive}`)
+      if (!isAlive) {
+        // 设备离线 -> 暂存指令（不保存到数据库，等上线发送成功后再保存）
+        console.log(`[DirectUpdate] 设备 ${deviceId} 离线，指令暂存`)
+        mqttClient.addPendingCommand(deviceId, config_id, value)
+
+        return res.json({
+          success: true,
+          message: '设备离线，指令已暂存，将在上线后自动发送并保存',
+          data: { status: 'queued' }
+        })
+      }
+    } else {
+      // 无指定设备（全局配置）-> 直接发送，不检查在线状态
+      console.log('[DirectUpdate] 全局配置，直接发送')
+    }
+
+    // 4. 设备在线 -> 先发送指令（发送两次以确保设备可靠接收）
     try {
       // 第一次发送
       await mqttClient.publish('control', payload)
@@ -100,8 +167,11 @@ module.exports = async (req, res) => {
       await mqttClient.publish('control', payload)
       console.log('[DirectUpdate] MQTT 第二次发送成功')
 
-      // 4. 发送成功后再保存到数据库
-      const saveResult = await saveDirectData({ config_id, value, d_no })
+      // 5. 发送成功后再保存到数据库
+      // 单设备模式：保存时传入设备号，保存为设备专属配置
+      // 多设备模式：保存时传入原始 d_no（null=全局，设备号=设备专属）
+      const saveDNo = SINGLE_DEVICE_MODE ? deviceId : d_no
+      const saveResult = await saveDirectData({ config_id, value, d_no: saveDNo })
       console.log('[DirectUpdate] 数据库保存成功:', saveResult)
 
       return res.json({
