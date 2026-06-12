@@ -1,4 +1,4 @@
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 async function saveSensorData(info) {
     // Map MQTT fields into the sensor history table.

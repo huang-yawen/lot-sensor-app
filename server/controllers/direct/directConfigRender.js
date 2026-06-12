@@ -1,4 +1,4 @@
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 // 组装全局配置和设备配置的最终渲染结果。
 module.exports = async (req, res) => {

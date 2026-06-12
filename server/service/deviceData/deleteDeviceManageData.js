@@ -1,22 +1,13 @@
-const promisePool = require('../../config/promisepool')
-const { formatDataWithUnit } = require('../../utils/helper')
+const promisePool = require('../../config/dbPool')
 
-// Delete a device record by primary key.
-module.exports= async (req, res) => {
-    try {
-        const id = req.body.id
-        const deleteId = Number(id)
-        await promisePool.execute(`DELETE FROM \`t_device\` WHERE \`id\` = ?;`, [deleteId])
-        res.json({
-            success: true
-        })
-    } catch (err) {
-        if (err) {
-            console.log("获取请求失败了" + err)
-        }
-        res.status(500).json({
-            success: false,
-            message: '删除失败：' + err.message
-        })
-    }
+/**
+ * 根据主键删除设备记录
+ * @param {Object} data - 请求数据
+ * @param {number} data.id - 设备ID
+ * @returns {Promise<{success: boolean}>}
+ */
+module.exports = async (data) => {
+    const deleteId = Number(data.id)
+    await promisePool.execute('DELETE FROM `t_device` WHERE `id` = ?', [deleteId])
+    return { success: true }
 }

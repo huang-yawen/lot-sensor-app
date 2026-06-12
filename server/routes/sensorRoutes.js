@@ -2,11 +2,14 @@ const express = require('express')
 const router = express.Router()
 
 // 传感器相关控制器
-const getSensorRealtime = require('../controllers/sensor/sensorRealtime')
+const getDashboardData = require('../controllers/sensor/getDashboardData')
 const getHistoryDataByType = require('../controllers/sensor/historyData')
 
 // 设备相关控制器
 const getDeviceManageList = require('../controllers/device/deviceManageList')
+const addDevice = require('../controllers/device/addDevice')
+const deleteDevice = require('../controllers/device/deleteDevice')
+const updateDevice = require('../controllers/device/updateDevice')
 
 // 故障相关控制器
 const getErrorHistory = require('../controllers/error/errorHistory')
@@ -16,24 +19,19 @@ const getErrorTypeStats = require('../controllers/error/errorTypeStats')
 const getDirectConfigTree = require('../controllers/direct/directConfigTree')
 const getDirectConfigRender = require('../controllers/direct/directConfigRender')
 
-// 设备管理服务
-const addDeviceManageData = require('../service/deviceData/addDeviceManageData')
-const deleteDeviceManageData = require('../service/deviceData/deleteDeviceManageData')
-const updateDeviceManageData = require('../service/deviceData/updateDeviceManageData')
-
 // 指令配置服务
 const updateMultipleDirectConfigs = require('../service/directData/updateMultipleDirectConfigs')
 const updateDirectConfigAndPublish = require('../service/directData/updateDirectConfigAndPublish')
 
 // 传感器接口
-router.get('/data', getSensorRealtime)
+router.get('/data', getDashboardData)
 router.get('/dataByType', getHistoryDataByType)
 
 // 设备管理接口
 router.get('/deviceData', getDeviceManageList)
-router.post('/deviceData/add', addDeviceManageData)
-router.post('/deviceData/delete', deleteDeviceManageData)
-router.post('/deviceData/update', updateDeviceManageData)
+router.post('/deviceData/add', addDevice)
+router.post('/deviceData/delete', deleteDevice)
+router.post('/deviceData/update', updateDevice)
 
 // 故障接口
 router.get('/errData', getErrorHistory)

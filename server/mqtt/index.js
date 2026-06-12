@@ -20,9 +20,9 @@
 const MqttClient = require('./mqttClient')
 const MessageRouter = require('./messageRouter')
 const DeviceManager = require('./deviceManager')
-const { handleSensorData, SENSOR_TOPIC } = require('./handlers/sensorHandler')
-const { handleBehaviorData, BEHAVIOR_TOPIC } = require('./handlers/behaviorHandler')
-const { handleErrorData, ERROR_TOPIC } = require('./handlers/errorHandler')
+const { handleMessage: handleSensorData, SENSOR_TOPIC } = require('./sensorRealtime/sensorRealtimeHandler')
+const { handleMessage: handleBehaviorData, BEHAVIOR_TOPIC } = require('./behaviorRealtime/behaviorRealtimeHandler')
+const { handleMessage: handleAbnormalStateData, ERROR_TOPIC: ABNORMAL_STATE_TOPIC } = require('./errorHistory/errorHistoryHandler')
 
 // ==================== 1. 读取配置 ====================
 
@@ -42,7 +42,7 @@ const config = {
   subscribeTopics: [
     { topic: SENSOR_TOPIC, qos: 1 },
     { topic: BEHAVIOR_TOPIC, qos: 1 },
-    { topic: ERROR_TOPIC, qos: 1 },
+    { topic: ABNORMAL_STATE_TOPIC, qos: 1 },
     { topic: 'heart_beat', qos: 1 },
   ]
 }
@@ -56,7 +56,7 @@ const mqttClient = new MqttClient(config)
 const router = new MessageRouter()
 router.register(SENSOR_TOPIC, handleSensorData)
 router.register(BEHAVIOR_TOPIC, handleBehaviorData)
-router.register(ERROR_TOPIC, handleErrorData)
+router.register(ABNORMAL_STATE_TOPIC, handleAbnormalStateData)
 
 /** 设备管理器 */
 const deviceManager = new DeviceManager(mqttClient)
@@ -64,9 +64,21 @@ const deviceManager = new DeviceManager(mqttClient)
 // ==================== 3. 连接消息处理 ====================
 
 mqttClient.on('message', async (topic, payload) => {
-  // 心跳消息特殊处理（纯文本，非 JSON）
+  // 心跳消息特殊处理
   if (topic === 'heart_beat') {
-    const deviceId = payload.toString().trim()
+    const raw = payload.toString().trim()
+    let deviceId = raw
+
+    // 尝试解析 JSON 格式的心跳（如 {"VID": "202177"}），提取 VID 字段
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && parsed.VID) {
+        deviceId = String(parsed.VID).trim()
+      }
+    } catch {
+      // 非 JSON 格式，直接使用原始字符串作为设备 ID
+    }
+
     if (deviceId) {
       deviceManager.onHeartbeat(deviceId)
     }
@@ -87,5 +99,6 @@ mqttClient.on('message', async (topic, payload) => {
 mqttClient.checkIfAlive = (deviceId) => deviceManager.isOnline(deviceId)
 mqttClient.addPendingCommand = (deviceId, configId, value) => deviceManager.addPendingCommand(deviceId, configId, value)
 mqttClient.publishJsonToDevice = (deviceId, topic, payload, options) => mqttClient.publish(topic, payload, options)
+mqttClient.getAllDeviceStatus = () => deviceManager.getAllDeviceStatus()
 
 module.exports = mqttClient

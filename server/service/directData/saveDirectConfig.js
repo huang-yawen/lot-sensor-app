@@ -3,7 +3,7 @@
  * 负责将设备配置保存到数据库，支持更新和插入操作
  */
 
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 /**
  * 标准化设备编号

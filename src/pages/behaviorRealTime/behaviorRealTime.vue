@@ -112,8 +112,8 @@ const initSelected = () => {
   selectedValue.value = sourceList.value[0][firstKey]
 }
 
-const reloadData = async () => {
-  loading.value = true
+const reloadData = async (showLoading = true) => {
+  if (showLoading) loading.value = true
   try {
     await store.fetchPaginationData({
       type: "behavior",
@@ -123,7 +123,7 @@ const reloadData = async () => {
     })
     initSelected()
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
     uni.stopPullDownRefresh()
   }
 }
@@ -165,13 +165,13 @@ onLoad(async () => {
   wsConnect({
     onMessage: (data) => {
       if (data.type === 'behavior_data') {
-        reloadData()
+        reloadData(false)
       }
     }
   })
 
   wsUnsubscribe = wsOn('behavior_data', () => {
-    reloadData()
+    reloadData(false)
   })
 })
 

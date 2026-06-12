@@ -1,4 +1,4 @@
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 const buildDeviceQuery = (searchMode, keywordLike, useCollate = false) => {
     if (searchMode === 'deviceName') {

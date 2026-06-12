@@ -4,7 +4,7 @@
  * 收到异常数据后，解析并存入数据库
  */
 
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 /** 异常数据主题 */
 const ERROR_TOPIC = 'abnormal_state'

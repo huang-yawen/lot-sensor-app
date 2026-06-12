@@ -1,4 +1,4 @@
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 const WARNING_FIELDS = {
     humi_warn: '湿度',

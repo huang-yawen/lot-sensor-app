@@ -1,4 +1,4 @@
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 // 统计故障类型数量，供图表展示使用。
 module.exports = async function getErrorTypeStats(query) {

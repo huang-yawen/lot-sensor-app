@@ -2,16 +2,16 @@
  * 直接指令更新服务
  * 
  * 流程：
- * 1. 保存指令配置到数据库
- * 2. 通过 MQTT 发送指令到设备
- * 3. 如果设备离线，暂存指令等待上线后发送
+ * 1. 先通过 MQTT 发送指令到设备（或暂存等待上线后发送）
+ * 2. 发送成功后再保存到数据库
+ * 3. 如果设备离线，暂存指令等待上线后发送，发送成功后再保存到数据库
  * 
  * 使用方式：
  *   POST /api/directData/update
  *   Body: { config_id, value, d_no }
  */
 
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 const mqttClient = require('../../mqtt')
 const { saveDirectData } = require('./saveDirectConfig')
 
@@ -30,6 +30,7 @@ const SWITCH_MAP = { on: 'open', off: 'close' }
 
 /**
  * 构建 MQTT 消息 payload
+ * 所有值统一转为字符串，确保整体为 JSON 格式
  * @param {number} configId
  * @param {*} value
  * @returns {Object}
@@ -42,14 +43,14 @@ function buildPayload(configId, value) {
     try {
       return typeof value === 'string' ? JSON.parse(value) : value
     } catch {
-      return { [key]: value }
+      return { [key]: String(value) }
     }
   }
 
-  // 开关类型值映射
+  // 开关类型值映射（on->open, off->close）
   const mappedValue = SWITCH_IDS.includes(Number(configId)) && SWITCH_MAP[value]
     ? SWITCH_MAP[value]
-    : value
+    : String(value)
 
   return { [key]: mappedValue }
 }
@@ -57,6 +58,8 @@ function buildPayload(configId, value) {
 /**
  * 处理指令更新请求
  * POST /directData/update
+ * 
+ * 流程：先发消息（或暂存），成功后再保存到数据库
  */
 module.exports = async (req, res) => {
   try {
@@ -67,44 +70,51 @@ module.exports = async (req, res) => {
       return res.status(400).json({ success: false, message: 'config_id 必填' })
     }
 
-    console.log('[DirectUpdate] 保存配置:', { config_id, value, d_no })
+    console.log('[DirectUpdate] 收到指令:', { config_id, value, d_no })
 
-    // 1. 保存到数据库
-    const saveResult = await saveDirectData({ config_id, value, d_no })
-
-    // 2. 构建 MQTT 消息
+    // 1. 构建 MQTT 消息
     const payload = buildPayload(config_id, value)
 
-    // 3. 检查设备在线状态
-    const deviceId = saveResult.d_no
-    if (deviceId && deviceId !== 'null' && !mqttClient.checkIfAlive(deviceId)) {
-      // 设备离线 -> 暂存指令
+    // 2. 检查设备在线状态
+    const deviceId = d_no && d_no !== 'null' ? d_no : null
+    if (deviceId && !mqttClient.checkIfAlive(deviceId)) {
+      // 设备离线 -> 暂存指令（不保存到数据库，等上线发送成功后再保存）
       console.log(`[DirectUpdate] 设备 ${deviceId} 离线，指令暂存`)
       mqttClient.addPendingCommand(deviceId, config_id, value)
 
       return res.json({
         success: true,
-        message: '配置已保存，设备离线，指令将在上线后自动发送',
-        data: { db: saveResult, status: 'queued' }
+        message: '设备离线，指令已暂存，将在上线后自动发送并保存',
+        data: { status: 'queued' }
       })
     }
 
-    // 4. 设备在线 -> 直接发送
+    // 3. 设备在线 -> 先发送指令（发送两次以确保设备可靠接收）
     try {
+      // 第一次发送
       await mqttClient.publish('control', payload)
-      console.log('[DirectUpdate] MQTT 发送成功')
+      console.log('[DirectUpdate] MQTT 第一次发送成功')
+
+      // 第二次发送（间隔 200ms，确保设备可靠接收）
+      await new Promise(resolve => setTimeout(resolve, 200))
+      await mqttClient.publish('control', payload)
+      console.log('[DirectUpdate] MQTT 第二次发送成功')
+
+      // 4. 发送成功后再保存到数据库
+      const saveResult = await saveDirectData({ config_id, value, d_no })
+      console.log('[DirectUpdate] 数据库保存成功:', saveResult)
 
       return res.json({
         success: true,
-        message: '配置已保存并发送',
+        message: '指令已发送并保存到数据库（已发送两次以确保接收）',
         data: { db: saveResult, status: 'published' }
       })
     } catch (err) {
       console.error('[DirectUpdate] MQTT 发送失败:', err.message)
       return res.json({
         success: true,
-        message: '配置已保存，但 MQTT 发送失败',
-        data: { db: saveResult, status: 'failed', error: err.message }
+        message: 'MQTT 发送失败，指令未保存到数据库',
+        data: { status: 'failed', error: err.message }
       })
     }
 
@@ -112,7 +122,7 @@ module.exports = async (req, res) => {
     console.error('[DirectUpdate] 服务器错误:', err)
     return res.status(500).json({
       success: false,
-      message: err.message || '保存配置失败'
+      message: err.message || '处理指令失败'
     })
   }
 }

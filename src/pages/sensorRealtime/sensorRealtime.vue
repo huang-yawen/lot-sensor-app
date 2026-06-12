@@ -141,13 +141,13 @@ const initSelected = () => {
   selectedValue.value = sourceList.value[0][firstKey]
 }
 
-const reloadData = async () => {
-  loading.value = true
+const reloadData = async (showLoading = true) => {
+  if (showLoading) loading.value = true
   try {
     await store.fetchData()
     initSelected()
   } finally {
-    loading.value = false
+    if (showLoading) loading.value = false
     uni.stopPullDownRefresh()
   }
 }
@@ -166,16 +166,16 @@ onLoad(async () => {
   // 连接 WebSocket，接收实时推送
   wsConnect({
     onMessage: (data) => {
-      // 收到 sensor_data 类型消息时自动刷新
+      // 收到 sensor_data 类型消息时静默刷新（不显示 loading）
       if (data.type === 'sensor_data') {
-        reloadData()
+        reloadData(false)
       }
     }
   })
 
   // 也可以通过事件监听方式注册
   wsUnsubscribe = wsOn('sensor_data', () => {
-    reloadData()
+    reloadData(false)
   })
 })
 

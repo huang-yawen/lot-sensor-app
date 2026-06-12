@@ -1,22 +1,19 @@
-const promisePool = require('../../config/promisepool')
-const { formatDataWithUnit } = require('../../utils/helper')
+const promisePool = require('../../config/dbPool')
 
-// Insert a new device record into the device table.
-module.exports= async (req, res) => {
-    try {
-        const request = req.body
-        await promisePool.execute(`insert into \`t_device\` (id,device_name,remarks,ctime,number) 
-            values(?,?,?,?,?)`, [Number(request.id), request['设备名称'], request['备注'], request['创立时间'], request['电车编号id']])
-        res.json({
-            success: true,
-            message: "成功啦！"
-        })
-    }
-    catch (err) {
-        console.log("device加入数据出错：", err);
-        return res.json({
-            success: false,
-            message: "后端执行失败：" + err.message
-        });
-    }
+/**
+ * 添加设备记录
+ * @param {Object} data - 设备数据
+ * @param {number} data.id - 设备ID
+ * @param {string} data['设备名称'] - 设备名称
+ * @param {string} data['备注'] - 备注
+ * @param {string} data['创立时间'] - 创建时间
+ * @param {string} data['电车编号id'] - 电车编号
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+module.exports = async (data) => {
+    await promisePool.execute(
+        `INSERT INTO \`t_device\` (id, device_name, remarks, ctime, number) VALUES (?, ?, ?, ?, ?)`,
+        [Number(data.id), data['设备名称'], data['备注'], data['创立时间'], data['电车编号id']]
+    )
+    return { success: true, message: '成功啦！' }
 }

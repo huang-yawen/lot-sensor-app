@@ -4,7 +4,7 @@
  * 收到行为数据后，解析并存入数据库
  */
 
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 /** 行为数据主题 */
 const BEHAVIOR_TOPIC = 'behavioral_data'
@@ -28,15 +28,34 @@ async function handleBehaviorData(topic, payload) {
       const placeholders = columns.map(() => '?').join(', ')
       const colNames = columns.join(', ')
 
-      await promisePool.query(
-        `INSERT INTO t_behavior_realtime (d_no, ${colNames}) VALUES (?, ${placeholders})`,
-        [d_no, ...values]
-      )
+      try {
+        const [result] = await promisePool.query(
+          `INSERT INTO t_behavior_realtime (d_no, ${colNames}) VALUES (?, ${placeholders})`,
+          [d_no, ...values]
+        )
+        console.log('[BehaviorHandler] 数据存储成功:', {
+          d_no,
+          insertId: result.insertId,
+          fields: JSON.stringify(fields)
+        })
+      } catch (dbErr) {
+        console.error('[BehaviorHandler] 数据存储失败:', {
+          d_no,
+          fields: JSON.stringify(fields),
+          error: dbErr.message,
+          stack: dbErr.stack
+        })
+        return null
+      }
     }
 
     return data
   } catch (err) {
-    console.error('[BehaviorHandler] 处理失败:', err.message)
+    console.error('[BehaviorHandler] 处理失败:', {
+      error: err.message,
+      stack: err.stack,
+      rawPayload: payload ? payload.toString().slice(0, 200) : 'empty'
+    })
     return null
   }
 }

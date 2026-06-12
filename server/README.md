@@ -1,85 +1,87 @@
-# IoT 传感器应用 - 后端使用指南
+# IoT 传感器应用 - 后端服务使用指南
 
 ## 📋 目录
 
 1. [项目概述](#1-项目概述)
-2. [技术栈](#2-技术栈)
-3. [环境要求](#3-环境要求)
-4. [快速开始](#4-快速开始)
-5. [项目结构](#5-项目结构)
-6. [配置文件说明](#6-配置文件说明)
-7. [数据库设计](#7-数据库设计)
-8. [API 接口文档](#8-api-接口文档)
-9. [MQTT 消息机制](#9-mqtt-消息机制)
-10. [WebSocket 实时推送](#10-websocket-实时推送)
-11. [服务层详解](#11-服务层详解)
-12. [控制器层详解](#12-控制器层详解)
-13. [中间件与工具函数](#13-中间件与工具函数)
-14. [开发指南](#14-开发指南)
-15. [常见问题排查](#15-常见问题排查)
+2. [环境要求](#2-环境要求)
+3. [快速开始](#3-快速开始)
+4. [项目结构](#4-项目结构)
+5. [配置文件说明](#5-配置文件说明)
+6. [数据库表结构](#6-数据库表结构)
+7. [API 接口文档](#7-api-接口文档)
+8. [MQTT 消息协议](#8-mqtt-消息协议)
+9. [WebSocket 实时推送](#9-websocket-实时推送)
+10. [核心模块详解](#10-核心模块详解)
+11. [开发指南](#11-开发指南)
+12. [常见问题](#12-常见问题)
 
 ---
 
 ## 1. 项目概述
 
-本项目是 IoT 传感器应用的后端服务，提供以下核心功能：
+本后端服务是一个 **IoT 传感器数据采集与管理平台**，提供以下核心功能：
 
-- **传感器数据采集与存储**：通过 MQTT 协议接收物联网设备上报的传感器数据、行为数据和异常状态数据，并存入 MySQL 数据库。
-- **RESTful API 接口**：为前端提供传感器实时数据查询、历史数据分页查询、设备管理（增删改查）、故障历史查询、指令配置管理等功能。
-- **WebSocket 实时推送**：将 MQTT 接收到的实时数据通过 WebSocket 广播给所有连接的前端客户端，实现页面数据的实时更新。
-- **指令下发**：支持通过 API 向 MQTT Broker 发布指令，远程控制物联网设备。
+- **MQTT 数据采集**：接收传感器设备通过 MQTT 协议上报的实时数据
+- **数据持久化**：将传感器数据、行为数据、异常状态数据存入 MySQL 数据库
+- **RESTful API**：提供设备管理、数据查询、指令配置等 HTTP 接口
+- **WebSocket 实时推送**：将 MQTT 收到的数据实时推送到前端客户端
+- **设备管理**：设备的增删改查及在线状态管理
+- **指令下发**：支持向设备下发配置指令（支持暂存指令，设备上线后自动下发）
 
----
+### 技术栈
 
-## 2. 技术栈
-
-| 技术 | 用途 |
+| 组件 | 技术 |
 |------|------|
-| **Node.js** | 运行时环境 |
-| **Express.js** | Web 框架，提供 RESTful API |
-| **MySQL2** | MySQL 数据库驱动（连接池模式） |
-| **MQTT.js** | MQTT 客户端，连接物联网 Broker |
-| **ws** | WebSocket 服务端，实现实时推送 |
-| **cors** | 跨域资源共享中间件 |
-| **dotenv** | 环境变量管理 |
+| 运行环境 | Node.js |
+| Web 框架 | Express |
+| 数据库 | MySQL |
+| MQTT 客户端 | mqtt.js |
+| WebSocket | ws |
+| 连接池 | mysql2/promise |
 
 ---
 
-## 3. 环境要求
+## 2. 环境要求
 
 - **Node.js** >= 14.x
+- **MySQL** >= 5.7
+- **MQTT Broker**（如 Mosquitto）>= 1.6
 - **npm** >= 6.x
-- **MySQL** >= 5.7（推荐 8.0+）
-- **MQTT Broker**（如 Mosquitto、EMQX 等，可选，用于接收设备数据）
+
+### 推荐环境
+
+- Node.js 18.x LTS
+- MySQL 8.0
+- Mosquitto 2.x
 
 ---
 
-## 4. 快速开始
+## 3. 快速开始
 
-### 4.1 安装依赖
+### 3.1 安装依赖
 
 ```bash
 cd server
 npm install
 ```
 
-### 4.2 配置环境变量
+### 3.2 配置环境变量
 
-复制 `.env.example` 为 `.env`，并根据实际环境修改配置：
+复制 `.env.example` 为 `.env` 并根据实际情况修改：
 
 ```bash
 cp .env.example .env
 ```
 
-### 4.3 初始化数据库
+### 3.3 初始化数据库
 
-执行 `wusiqi.sql` 或 `init/init_calibrate_time.sql` 中的 SQL 语句创建数据库和表结构：
+执行 SQL 脚本创建数据库和表：
 
 ```bash
 mysql -u root -p < wusiqi.sql
 ```
 
-### 4.4 启动服务
+### 3.4 启动服务
 
 ```bash
 # 开发模式（热重载）
@@ -87,260 +89,532 @@ npm run dev
 
 # 生产模式
 npm start
+
+# 或直接使用 Node
+node app.js
 ```
 
-服务默认启动在 `http://localhost:3000`。
-
-### 4.5 验证服务
-
-访问以下地址验证服务是否正常运行：
+启动成功后，控制台输出：
 
 ```
-http://localhost:3000/api/mqtt/status
+Server started: http://localhost:3000
+WebSocket server: ws://localhost:3000/ws
+✅ 数据库连接成功
+✅ MQTT 连接成功！
 ```
 
-预期返回：
+---
+
+## 4. 项目结构
+
+```
+server/
+├── app.js                          # 应用入口（Express + WebSocket）
+├── package.json                    # 依赖配置
+├── .env                            # 环境变量（不提交到 Git）
+├── .env.example                    # 环境变量模板
+├── wusiqi.sql                      # 数据库初始化脚本
+│
+├── config/                         # 配置文件
+│   ├── env.js                      # 环境变量加载
+│   └── dbPool.js                   # MySQL 连接池
+│
+├── controllers/                    # 控制器层（处理 HTTP 请求）
+│   ├── sensor/
+│   │   ├── getDashboardData.js     # 获取传感器仪表盘数据
+│   │   └── historyData.js          # 获取历史数据（按类型）
+│   ├── device/
+│   │   ├── deviceManageList.js     # 获取设备管理列表
+│   │   ├── addDevice.js            # 添加设备
+│   │   ├── deleteDevice.js         # 删除设备
+│   │   └── updateDevice.js         # 更新设备
+│   ├── error/
+│   │   ├── errorHistory.js         # 获取故障历史
+│   │   └── errorTypeStats.js       # 获取故障类型统计
+│   └── direct/
+│       ├── directConfigTree.js     # 获取指令配置树
+│       └── directConfigRender.js   # 获取指令配置渲染数据
+│
+├── service/                        # 服务层（业务逻辑）
+│   ├── deviceData/
+│   │   ├── getDeviceManageList.js  # 查询设备列表
+│   │   ├── addDeviceManageData.js  # 添加设备数据
+│   │   ├── deleteDeviceManageData.js # 删除设备数据
+│   │   └── updateDeviceManageData.js # 更新设备数据
+│   ├── directData/
+│   │   ├── getDirectConfigTree.js  # 获取指令配置树
+│   │   ├── saveDirectConfig.js     # 保存指令配置
+│   │   ├── updateDirectConfigAndPublish.js # 更新配置并发布 MQTT
+│   │   └── updateMultipleDirectConfigs.js  # 批量更新配置
+│   ├── errorHistory/
+│   │   ├── getErrorHistory.js      # 查询故障历史
+│   │   └── getErrorTypeStats.js    # 查询故障类型统计
+│   └── historyData/
+│       └── getHistoryDataByType.js # 按类型查询历史数据
+│
+├── routes/                         # 路由配置
+│   └── sensorRoutes.js             # 所有 API 路由
+│
+├── middleware/                      # 中间件（预留）
+│
+├── mqtt/                           # MQTT 模块
+│   ├── index.js                    # MQTT 模块入口
+│   ├── mqttClient.js               # MQTT 客户端封装
+│   ├── messageRouter.js            # 消息路由器
+│   ├── deviceManager.js            # 设备管理器（心跳、在线状态、暂存指令）
+│   ├── sensorRealtime/             # 传感器实时数据处理
+│   │   ├── sensorRealtimeHandler.js  # 处理器
+│   │   └── sensorRealtimeRepository.js # 数据库操作
+│   ├── behaviorRealtime/           # 行为实时数据处理
+│   │   ├── behaviorRealtimeHandler.js # 处理器
+│   │   └── behaviorRealtimeRepository.js # 数据库操作
+│   ├── errorHistory/               # 异常状态数据处理
+│   │   ├── errorHistoryHandler.js    # 处理器
+│   │   └── errorHistoryRepository.js # 数据库操作
+│   └── handlers/                   # 备用处理器（未启用）
+│       ├── sensorHandler.js
+│       ├── behaviorHandler.js
+│       └── abnormalStateHandler.js
+│
+├── utils/                          # 工具函数
+│   └── helper.js                   # 辅助函数
+│
+├── init/                           # 初始化脚本
+│   └── init_calibrate_time.sql     # 校准时间初始化 SQL
+│
+└── .backend-err.log                # 错误日志文件
+```
+
+---
+
+## 5. 配置文件说明
+
+### 5.1 环境变量（.env）
+
+```env
+# 服务器端口
+PORT=3000
+
+# 数据库配置
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=123456
+DB_NAME=third
+
+# MQTT Broker 配置
+MQTT_URL=mqtt://localhost:1883
+MQTT_USERNAME=
+MQTT_PASSWORD=
+
+# 前端静态文件路径（可选，用于生产环境部署）
+FRONTEND_DIST_PATH=D:/HUYa的桌面/LOT/dist
+```
+
+### 5.2 数据库连接池（config/dbPool.js）
+
+使用 `mysql2/promise` 连接池，默认配置：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| host | `DB_HOST` | 数据库主机 |
+| port | `DB_PORT` | 数据库端口 |
+| user | `DB_USER` | 数据库用户 |
+| password | `DB_PASSWORD` | 数据库密码 |
+| database | `DB_NAME` | 数据库名 |
+| waitForConnections | `true` | 等待连接 |
+| connectionLimit | `10` | 最大连接数 |
+| queueLimit | `0` | 队列限制（0=不限制） |
+
+---
+
+## 6. 数据库表结构
+
+### 6.1 t_sensor_data - 传感器数据表
+
+存储传感器上报的实时数据。
+
+```sql
+CREATE TABLE t_sensor_data (
+  id          INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  d_no        VARCHAR(64)   COMMENT '设备编号',
+  field1      VARCHAR(255)  COMMENT '水温1（t1）',
+  field2      VARCHAR(255)  COMMENT '水温2（t2）',
+  field3      VARCHAR(255)  COMMENT '水质1（tds1）',
+  field4      VARCHAR(255)  COMMENT '水质2（tds2）',
+  field5      VARCHAR(255)  COMMENT '备用字段5',
+  field6      VARCHAR(255)  COMMENT '备用字段6',
+  field7      VARCHAR(255)  COMMENT '备用字段7',
+  field8      VARCHAR(255)  COMMENT '备用字段8',
+  field9      VARCHAR(255)  COMMENT '备用字段9',
+  field10     VARCHAR(255)  COMMENT '备用字段10',
+  c_time      DATETIME      COMMENT '采集时间',
+  online      VARCHAR(4)    COMMENT '在线状态（实时数据/保留数据）',
+  pid         VARCHAR(20)   COMMENT 'PID 参数',
+  pid2        VARCHAR(20)   COMMENT 'PID2 参数'
+);
+```
+
+**字段映射关系**（通过 `t_sensor_field_mapper` 表定义）：
+
+| 物理字段 | 协议字段(p_name) | 显示名称(f_name) |
+|----------|-----------------|-----------------|
+| field1   | t1              | 水温            |
+| field2   | t2              | 水温2           |
+| field3   | tds1            | 水质1           |
+| field4   | tds2            | 水质2           |
+
+### 6.2 t_behavior_data - 行为数据表
+
+存储设备行为/状态数据。
+
+```sql
+CREATE TABLE t_behavior_data (
+  id          INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  d_no        VARCHAR(64)   COMMENT '设备编号',
+  field1      VARCHAR(255)  COMMENT '模式（mode）',
+  field2      VARCHAR(255)  COMMENT '风机（fan）',
+  field3      VARCHAR(255)  COMMENT '风机转速（fan_speed）',
+  field4      VARCHAR(255)  COMMENT '空调（air）',
+  field5      VARCHAR(255)  COMMENT '空调模式（acmode）',
+  field6      VARCHAR(255)  COMMENT '空调功率（air_power）',
+  field7      VARCHAR(255)  COMMENT 'LED（led）',
+  field8      VARCHAR(255)  COMMENT 'LED功率（led_power）',
+  field9      VARCHAR(255)  COMMENT '备用字段9',
+  field10     VARCHAR(255)  COMMENT '备用字段10',
+  c_time      DATETIME      COMMENT '采集时间',
+  online      VARCHAR(4)    COMMENT '在线状态'
+);
+```
+
+**字段映射关系**（通过 `t_behavior_field_mapper` 表定义）：
+
+| 物理字段 | 协议字段(p_name) | 显示名称(f_name) |
+|----------|-----------------|-----------------|
+| field1   | mode            | 模式            |
+| field2   | fan             | 风机            |
+| field3   | fan_speed       | 风机转速        |
+| field4   | air             | 空调            |
+| field5   | acmode          | 空调模式        |
+| field6   | air_power       | 空调功率        |
+| field7   | led             | LED             |
+| field8   | led_power       | LED功率         |
+
+### 6.3 t_error_msg - 故障消息表
+
+存储设备上报的异常/故障信息。
+
+```sql
+CREATE TABLE t_error_msg (
+  id      INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  d_no    VARCHAR(16)   COMMENT '设备编号',
+  c_time  DATETIME      COMMENT '发生时间',
+  e_msg   VARCHAR(255)  COMMENT '故障描述',
+  e_no    VARCHAR(255)  COMMENT '故障编号',
+  type    VARCHAR(15)   COMMENT '故障类型'
+);
+```
+
+**故障类型定义**：
+
+| 协议字段 | 标签 | 说明 |
+|----------|------|------|
+| humi_warn | 湿度 | 湿度异常 |
+| smog_warn | 烟雾 | 烟雾异常 |
+| fan_warn | 风机 | 风机异常 |
+| air_warn | 空调 | 空调异常 |
+| outage_overtime | 电源 | 电源异常 |
+
+### 6.4 t_device - 设备表
+
+```sql
+CREATE TABLE t_device (
+  id        INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  d_no      VARCHAR(64)   COMMENT '设备编号',
+  d_name    VARCHAR(255)  COMMENT '设备名称',
+  d_type    VARCHAR(255)  COMMENT '设备类型',
+  d_addr    VARCHAR(255)  COMMENT '设备地址',
+  d_phone   VARCHAR(255)  COMMENT '联系电话',
+  d_other   VARCHAR(255)  COMMENT '其他信息',
+  c_time    DATETIME      COMMENT '创建时间'
+);
+```
+
+### 6.5 t_direct - 指令配置表
+
+```sql
+CREATE TABLE t_direct (
+  id        INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  d_no      VARCHAR(64)   COMMENT '设备编号',
+  d_name    VARCHAR(255)  COMMENT '指令名称',
+  d_type    VARCHAR(255)  COMMENT '指令类型',
+  d_value   VARCHAR(255)  COMMENT '指令值',
+  d_other   VARCHAR(255)  COMMENT '其他信息',
+  c_time    DATETIME      COMMENT '创建时间'
+);
+```
+
+### 6.6 t_direct_config - 指令配置详情表
+
+```sql
+CREATE TABLE t_direct_config (
+  id          INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  d_no        VARCHAR(64)   COMMENT '设备编号',
+  config_id   VARCHAR(64)   COMMENT '配置项ID',
+  config_name VARCHAR(255)  COMMENT '配置项名称',
+  config_value VARCHAR(255) COMMENT '配置项值',
+  config_type VARCHAR(255)  COMMENT '配置项类型',
+  c_time      DATETIME      COMMENT '创建时间'
+);
+```
+
+### 6.7 t_sensor_field_mapper - 传感器字段映射表
+
+```sql
+CREATE TABLE t_sensor_field_mapper (
+  id      INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  p_name  VARCHAR(64)   COMMENT '协议字段名',
+  db_name VARCHAR(64)   COMMENT '数据库字段名',
+  f_name  VARCHAR(64)   COMMENT '显示名称'
+);
+```
+
+### 6.8 t_behavior_field_mapper - 行为字段映射表
+
+```sql
+CREATE TABLE t_behavior_field_mapper (
+  id      INT           NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  p_name  VARCHAR(64)   COMMENT '协议字段名',
+  db_name VARCHAR(64)   COMMENT '数据库字段名',
+  f_name  VARCHAR(64)   COMMENT '显示名称'
+);
+```
+
+---
+
+## 7. API 接口文档
+
+所有 API 接口统一挂载在根路径 `/` 下（注意：**不是** `/api` 前缀）。
+
+### 7.1 传感器数据
+
+#### GET /data - 获取传感器仪表盘数据
+
+获取最新的传感器数据，用于仪表盘展示。
+
+**响应示例：**
+
 ```json
 {
   "success": true,
   "data": {
-    "isConnected": false,
-    "clientInitialized": false,
-    "url": "mqtt://localhost:1883"
+    "sensorData": {
+      "d_no": "202106",
+      "field1": "25.5",
+      "field2": "26.0",
+      "field3": "150",
+      "field4": "160",
+      "c_time": "2024-01-15T10:30:00.000Z",
+      "online": "实时数据"
+    },
+    "fieldMappers": [
+      { "p_name": "t1", "db_name": "field1", "f_name": "水温" },
+      { "p_name": "t2", "db_name": "field2", "f_name": "水温2" },
+      { "p_name": "tds1", "db_name": "field3", "f_name": "水质1" },
+      { "p_name": "tds2", "db_name": "field4", "f_name": "水质2" }
+    ]
   }
 }
 ```
 
----
+#### GET /dataByType - 获取历史数据（按类型）
 
-## 5. 项目结构
-
-```
-server/
-├── app.js                          # 应用入口，Express + WebSocket 服务器
-├── package.json                    # 项目依赖配置
-├── .env                            # 环境变量配置（敏感信息）
-├── .env.example                    # 环境变量模板
-├── wusiqi.sql                      # 数据库初始化脚本
-├── .backend-err.log                # 后端错误日志
-│
-├── config/                         # 配置文件
-│   ├── env.js                      # 环境变量加载器
-│   └── promisepool.js              # MySQL 连接池配置
-│
-├── routes/                         # 路由定义
-│   └── sensorRoutes.js             # 所有 API 路由汇总
-│
-├── controllers/                    # 控制器层（请求处理）
-│   ├── sensor/
-│   │   ├── sensorRealtime.js       # 传感器实时数据
-│   │   └── historyData.js          # 历史数据查询
-│   ├── device/
-│   │   └── deviceManageList.js     # 设备列表查询
-│   ├── error/
-│   │   ├── errorHistory.js         # 故障历史查询
-│   │   └── errorTypeStats.js       # 故障类型统计
-│   └── direct/
-│       ├── directConfigTree.js     # 指令配置树
-│       └── directConfigRender.js   # 指令配置渲染
-│
-├── service/                        # 服务层（业务逻辑）
-│   ├── deviceData/
-│   │   ├── getDeviceManageList.js  # 获取设备列表
-│   │   ├── addDeviceManageData.js  # 添加设备
-│   │   ├── deleteDeviceManageData.js # 删除设备
-│   │   └── updateDeviceManageData.js # 更新设备
-│   ├── historyData/
-│   │   └── getHistoryDataByType.js # 按类型查询历史数据
-│   ├── errorHistory/
-│   │   ├── getErrorHistory.js      # 获取故障历史
-│   │   └── getErrorTypeStats.js    # 获取故障类型统计
-│   └── directData/
-│       ├── updateDirectConfigAndPublish.js  # 更新指令配置并发布
-│       └── updateMultipleDirectConfigs.js   # 批量更新指令配置
-│
-├── mqtt/                           # MQTT 消息处理
-│   ├── index.js                    # MQTT 客户端入口（事件发射器）
-│   ├── mqttClient.js               # MQTT 客户端核心逻辑
-│   ├── messageRouter.js            # 消息路由器（按主题分发）
-│   ├── deviceManager.js            # 设备管理器（在线状态管理）
-│   ├── handlers/                   # 消息处理器
-│   │   ├── sensorHandler.js        # 传感器数据处理器
-│   │   ├── behaviorHandler.js      # 行为数据处理器
-│   │   └── errorHandler.js         # 异常数据处理器
-│   ├── sensorRealtime/             # 传感器实时数据处理
-│   │   └── index.js
-│   ├── behaviorRealtime/           # 行为实时数据处理
-│   │   ├── behaviorRealtimeHandler.js
-│   │   └── behaviorRealtimeRepository.js
-│   └── errorHistory/              # 故障历史处理
-│       └── index.js
-│
-├── middleware/                     # 中间件（预留）
-│
-├── utils/                         # 工具函数
-│   └── helper.js                  # 数据格式化工具
-│
-└── init/                          # 初始化脚本
-    └── init_calibrate_time.sql    # 校准时间表初始化
-```
-
----
-
-## 6. 配置文件说明
-
-### 6.1 `.env` 环境变量
-
-| 变量名 | 说明 | 默认值 |
-|--------|------|--------|
-| `PORT` | 服务端口 | `3000` |
-| `DB_HOST` | 数据库主机 | `localhost` |
-| `DB_PORT` | 数据库端口 | `3306` |
-| `DB_USER` | 数据库用户名 | `root` |
-| `DB_PASSWORD` | 数据库密码 | `""` |
-| `DB_NAME` | 数据库名 | `task` |
-| `DB_CONNECTION_LIMIT` | 连接池最大连接数 | `10` |
-| `MQTT_URL` | MQTT Broker 地址 | `mqtt://localhost:1883` |
-| `MQTT_TOPICS` | 订阅的主题（逗号分隔） | `sensor_data,behavioral_data,abnormal_state` |
-| `FRONTEND_DIST_PATH` | 前端静态文件路径 | `../../dist` |
-
-### 6.2 `config/env.js` 环境变量加载器
-
-- 自动从 `server/.env` 和项目根目录 `.env` 两个位置加载环境变量。
-- 支持 `#` 注释行。
-- 支持双引号和单引号包裹的值。
-- 已存在的环境变量不会被覆盖。
-
-### 6.3 `config/promisepool.js` 数据库连接池
-
-- 使用 `mysql2` 连接池，支持 Promise 异步操作。
-- 连接池参数通过环境变量配置。
-- 启动时自动检测数据库连接状态。
-- 设置 `dateStrings: true`，日期以字符串形式返回，避免时区问题。
-
----
-
-## 7. 数据库设计
-
-### 7.1 核心表结构
-
-| 表名 | 说明 | 关键字段 |
-|------|------|----------|
-| `t_sensor_data` | 传感器历史数据 | `id`, `d_no`(储运箱ID), `pid`(物体编号), `c_time`, `online` |
-| `t_sensor_realtime` | 传感器实时数据 | `id`, `d_no`, 动态字段 |
-| `t_behavior_data` | 行为历史数据 | `id`, `d_no`, `c_time`, `online` |
-| `t_behavior_realtime` | 行为实时数据 | `id`, `d_no`, 动态字段 |
-| `t_error_msg` | 故障消息 | `id`, `d_no`, `e_msg`(故障原因), `c_time` |
-| `t_error_history` | 故障历史 | `id`, `d_no`, 动态字段 |
-| `t_device` | 设备管理 | `id`, `device_name`, `number`(电车编号), `remarks`, `ctime` |
-| `t_sensor_field_mapper` | 传感器字段映射 | `f_name`(前端显示名), `db_name`(数据库字段名), `unit`(单位), `visible` |
-| `t_behavior_field_mapper` | 行为字段映射 | `p_name`(前端显示名), `db_name`(数据库字段名) |
-| `t_direct_config` | 指令配置 | 指令相关配置项 |
-
-### 7.2 字段映射机制
-
-传感器数据使用 `t_sensor_field_mapper` 表实现字段名映射：
-- `db_name`：数据库中的原始字段名
-- `f_name`：返回给前端的中文显示名
-- `unit`：字段单位（如 ℃、%RH 等）
-- `visible`：是否在前端可见
-
-行为数据使用 `t_behavior_field_mapper` 表实现类似映射。
-
----
-
-## 8. API 接口文档
-
-### 8.1 传感器接口
-
-#### GET `/data` - 获取传感器实时数据
-
-**请求参数：**
+**查询参数：**
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `online` | string | 否 | 在线状态过滤（如 `online`、`offline`） |
+| type | string | 是 | 数据类型：`sensor` 或 `behavior` |
+| page | number | 否 | 页码，默认 1 |
+| pageSize | number | 否 | 每页条数，默认 20 |
 
 **响应示例：**
 
 ```json
 {
   "success": true,
-  "message": "成功",
-  "processedData": [
-    {
-      "id": 1,
-      "储运箱ID": "D001",
-      "物体编号": "P001",
-      "温度": 25.3,
-      "湿度": 60.5,
-      "创立时间": "2024-01-01 12:00:00",
-      "数据类型": "online"
-    }
-  ],
-  "fieldUnits": {
-    "温度": "℃",
-    "湿度": "%RH"
-  },
-  "sortedData": {
-    "D001": [
-      { "id": 1, "储运箱ID": "D001", "创立时间": "2024-01-01", "故障原因": "温度过高" }
-    ]
-  },
-  "behaviorOutcome": [
-    {
-      "id": 1,
-      "储运箱ID": "D001",
-      "行为类型": "开门",
-      "数据类型": "online",
-      "更新时间": "2024-01-01 12:00:00"
-    }
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "d_no": "202106",
+        "field1": "25.5",
+        "c_time": "2024-01-15T10:30:00.000Z"
+      }
+    ],
+    "total": 100,
+    "page": 1,
+    "pageSize": 20
+  }
+}
+```
+
+### 7.2 设备管理
+
+#### GET /deviceData - 获取设备管理列表
+
+**查询参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| page | number | 否 | 页码，默认 1 |
+| pageSize | number | 否 | 每页条数，默认 10 |
+
+**响应示例：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "d_no": "202106",
+        "d_name": "传感器设备1",
+        "d_type": "温度传感器",
+        "d_addr": "A区1号",
+        "d_phone": "13800138000",
+        "c_time": "2024-01-15T10:30:00.000Z"
+      }
+    ],
+    "total": 50,
+    "page": 1,
+    "pageSize": 10
+  }
+}
+```
+
+#### POST /deviceData/add - 添加设备
+
+**请求体：**
+
+```json
+{
+  "d_no": "202107",
+  "d_name": "新设备",
+  "d_type": "温度传感器",
+  "d_addr": "A区2号",
+  "d_phone": "13900139000"
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "message": "设备添加成功"
+}
+```
+
+#### POST /deviceData/delete - 删除设备
+
+**请求体：**
+
+```json
+{
+  "d_no": "202107"
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "message": "设备删除成功"
+}
+```
+
+#### POST /deviceData/update - 更新设备
+
+**请求体：**
+
+```json
+{
+  "d_no": "202106",
+  "d_name": "更新后的名称",
+  "d_type": "湿度传感器",
+  "d_addr": "B区1号",
+  "d_phone": "13700137000"
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "message": "设备更新成功"
+}
+```
+
+### 7.3 故障管理
+
+#### GET /errData - 获取故障历史
+
+**查询参数：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| page | number | 否 | 页码，默认 1 |
+| pageSize | number | 否 | 每页条数，默认 20 |
+| type | string | 否 | 故障类型筛选 |
+
+**响应示例：**
+
+```json
+{
+  "success": true,
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "d_no": "202106",
+        "c_time": "2024-01-15T10:30:00.000Z",
+        "e_msg": "湿度异常，烟雾正常，风机正常，空调正常，电源正常",
+        "e_no": "ERR001",
+        "type": "湿度异常"
+      }
+    ],
+    "total": 30,
+    "page": 1,
+    "pageSize": 20
+  }
+}
+```
+
+#### GET /errTypeStats - 获取故障类型统计
+
+**响应示例：**
+
+```json
+{
+  "success": true,
+  "data": [
+    { "type": "湿度异常", "count": 10 },
+    { "type": "烟雾异常", "count": 5 },
+    { "type": "风机异常", "count": 3 },
+    { "type": "空调异常", "count": 7 },
+    { "type": "电源异常", "count": 2 }
   ]
 }
 ```
 
-**说明：** 此接口一次性返回传感器数据、故障数据和行为数据，方便首页一次渲染。
+### 7.4 指令配置
 
----
+#### GET /directData - 获取指令配置树
 
-#### GET `/dataByType` - 按类型查询历史数据
-
-**请求参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `type` | string | 是 | 数据类型：`sensor` / `behavior` / `error` |
-| `page` | number | 否 | 页码，默认 `1` |
-| `pageSize` | number | 否 | 每页条数，默认 `20` |
-| `d_no` | string | 否 | 按储运箱ID筛选 |
-| `startTime` | string | 否 | 开始时间 |
-| `endTime` | string | 否 | 结束时间 |
-
-**响应示例：**
-
-```json
-{
-  "success": true,
-  "data": [...],
-  "total": 100,
-  "page": 1,
-  "pageSize": 20
-}
-```
-
----
-
-### 8.2 设备管理接口
-
-#### GET `/deviceData` - 获取设备列表
-
-**请求参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `page` | number | 否 | 页码，默认 `1` |
-| `pageSize` | number | 否 | 每页条数，默认 `10` |
-| `keyword` | string | 否 | 搜索关键字（按设备名称或编号搜索） |
+获取所有设备的指令配置，以树形结构返回。
 
 **响应示例：**
 
@@ -349,115 +623,24 @@ server/
   "success": true,
   "data": [
     {
-      "id": 1,
-      "device_name": "传感器A",
-      "number": "EV001",
-      "remarks": "主仓库",
-      "ctime": "2024-01-01"
+      "d_no": "202106",
+      "d_name": "设备1",
+      "configs": [
+        {
+          "config_id": "temp_threshold",
+          "config_name": "温度阈值",
+          "config_value": "30",
+          "config_type": "number"
+        }
+      ]
     }
-  ],
-  "total": 50,
-  "page": 1,
-  "pageSize": 10
+  ]
 }
 ```
 
----
+#### GET /directRender - 获取指令配置渲染数据
 
-#### POST `/deviceData/add` - 添加设备
-
-**请求体：**
-
-```json
-{
-  "id": 1001,
-  "设备名称": "传感器B",
-  "备注": "备用设备",
-  "创立时间": "2024-01-15",
-  "电车编号id": "EV002"
-}
-```
-
-**响应：**
-
-```json
-{
-  "success": true,
-  "message": "成功啦！"
-}
-```
-
----
-
-#### POST `/deviceData/delete` - 删除设备
-
-**请求体：**
-
-```json
-{
-  "id": 1001
-}
-```
-
-**响应：**
-
-```json
-{
-  "success": true
-}
-```
-
----
-
-#### POST `/deviceData/update` - 更新设备
-
-**请求体：**
-
-```json
-{
-  "oldId": 1001,
-  "id": 1002,
-  "设备名称": "传感器B-更新",
-  "电车编号id": "EV003",
-  "备注": "已迁移"
-}
-```
-
-**响应：**
-
-```json
-{
-  "success": true,
-  "message": "修改成功！"
-}
-```
-
----
-
-### 8.3 故障接口
-
-#### GET `/errData` - 获取故障历史
-
-**请求参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `page` | number | 否 | 页码，默认 `1` |
-| `pageSize` | number | 否 | 每页条数，默认 `20` |
-| `d_no` | string | 否 | 按储运箱ID筛选 |
-| `startTime` | string | 否 | 开始时间 |
-| `endTime` | string | 否 | 结束时间 |
-
----
-
-#### GET `/errTypeStats` - 获取故障类型统计
-
-**请求参数：**
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `startTime` | string | 否 | 开始时间 |
-| `endTime` | string | 否 | 结束时间 |
+获取指令配置的渲染数据（用于前端动态渲染配置表单）。
 
 **响应示例：**
 
@@ -465,62 +648,72 @@ server/
 {
   "success": true,
   "data": [
-    { "errorType": "温度过高", "count": 15 },
-    { "errorType": "湿度过低", "count": 8 }
+    {
+      "config_id": "temp_threshold",
+      "config_name": "温度阈值",
+      "config_value": "30",
+      "config_type": "number"
+    }
   ]
 }
 ```
 
----
+#### POST /directData/update - 更新指令配置并发布 MQTT
 
-### 8.4 指令配置接口
-
-#### GET `/directData` - 获取指令配置树
-
-返回指令配置的树形结构，用于前端展示配置层级。
-
----
-
-#### GET `/directRender` - 获取指令配置渲染数据
-
-返回指令配置的渲染数据，包含字段映射和显示信息。
-
----
-
-#### POST `/multipleDirectData` - 批量更新指令配置
+更新指定设备的指令配置，并通过 MQTT 发布到设备。
 
 **请求体：**
 
 ```json
 {
+  "d_no": "202106",
+  "config_id": "temp_threshold",
+  "config_value": "35"
+}
+```
+
+**响应：**
+
+```json
+{
+  "success": true,
+  "message": "配置更新成功，已发布到设备"
+}
+```
+
+**MQTT 发布流程：**
+1. 更新数据库中的配置值
+2. 构建 MQTT 消息（JSON 格式）
+3. 发布到主题 `direct_data`（QoS 1）
+4. **发布两次**（确保设备收到）
+5. 将指令添加到设备的暂存队列（设备离线时，上线后自动下发）
+
+#### POST /multipleDirectData - 批量更新指令配置
+
+**请求体：**
+
+```json
+{
+  "d_no": "202106",
   "configs": [
-    { "id": 1, "value": "new_value_1" },
-    { "id": 2, "value": "new_value_2" }
+    { "config_id": "temp_threshold", "config_value": "35" },
+    { "config_id": "humi_threshold", "config_value": "80" }
   ]
 }
 ```
 
----
-
-#### POST `/directData/update` - 更新指令配置并发布到 MQTT
-
-**请求体：**
+**响应：**
 
 ```json
 {
-  "id": 1,
-  "value": "new_value",
-  "d_no": "D001"
+  "success": true,
+  "message": "批量配置更新成功"
 }
 ```
 
-**说明：** 此接口不仅更新数据库中的指令配置，还会通过 MQTT 将指令发布到 Broker，远程控制设备。
+### 7.5 系统状态
 
----
-
-### 8.5 系统接口
-
-#### GET `/api/mqtt/status` - MQTT 连接状态诊断
+#### GET /mqtt/status - 获取 MQTT 连接状态
 
 **响应示例：**
 
@@ -537,107 +730,149 @@ server/
 
 ---
 
-## 9. MQTT 消息机制
+## 8. MQTT 消息协议
 
-### 9.1 架构概览
+### 8.1 订阅主题
+
+服务启动时会自动订阅以下主题：
+
+| 主题 | QoS | 说明 |
+|------|-----|------|
+| `sensor_data` | 1 | 传感器数据上报 |
+| `behavioral_data` | 1 | 行为数据上报 |
+| `abnormal_state` | 1 | 异常状态上报 |
+| `heart_beat` | 1 | 设备心跳 |
+
+### 8.2 发布主题
+
+| 主题 | QoS | 说明 |
+|------|-----|------|
+| `direct_data` | 1 | 指令下发到设备 |
+
+### 8.3 消息格式
+
+#### 传感器数据（sensor_data）
+
+```json
+{
+  "VID": "202106",
+  "PID": "P001",
+  "Tin": "25.5",
+  "Tout": "26.0",
+  "LXin": "150",
+  "Time": "2024-01-15 10:30:00",
+  "online": "1"
+}
+```
+
+**字段说明：**
+
+| 字段 | 映射到数据库 | 说明 |
+|------|-------------|------|
+| VID | d_no | 设备编号 |
+| PID | pid | PID 参数 |
+| Tin | field1 | 水温1 |
+| Tout | field2 | 水温2 |
+| LXin | field3 | 水质1 |
+| Time | c_time | 采集时间 |
+| online | online | 在线状态（1=实时数据，其他=保留数据） |
+
+#### 行为数据（behavioral_data）
+
+```json
+{
+  "mode": "auto",
+  "fan": "on",
+  "fan_speed": "3",
+  "air": "on",
+  "acmode": "cool",
+  "air_power": "1000",
+  "led": "on",
+  "led_power": "50",
+  "Time": "2024-01-15 10:30:00",
+  "online": "1"
+}
+```
+
+**字段说明：**
+
+| 字段 | 映射到数据库 | 说明 |
+|------|-------------|------|
+| mode | field1 | 模式 |
+| fan | field2 | 风机状态 |
+| fan_speed | field3 | 风机转速 |
+| air | field4 | 空调状态 |
+| acmode | field5 | 空调模式 |
+| air_power | field6 | 空调功率 |
+| led | field7 | LED 状态 |
+| led_power | field8 | LED 功率 |
+| Time | c_time | 采集时间 |
+| online | online | 在线状态 |
+
+> **注意**：行为数据的 `d_no` 目前硬编码为 `'202106'`，因为当前只有一套设备。
+
+#### 异常状态数据（abnormal_state）
+
+```json
+{
+  "humi_warn": 1,
+  "smog_warn": 0,
+  "fan_warn": 0,
+  "air_warn": 1,
+  "outage_overtime": 0,
+  "Time": "2024-01-15 10:30:00",
+  "e_no": "ERR001",
+  "online": "1"
+}
+```
+
+**字段说明：**
+
+| 字段 | 说明 |
+|------|------|
+| humi_warn | 湿度告警（1=异常，0=正常） |
+| smog_warn | 烟雾告警 |
+| fan_warn | 风机告警 |
+| air_warn | 空调告警 |
+| outage_overtime | 电源告警 |
+| Time | 发生时间 |
+| e_no | 故障编号 |
+
+**自动生成的字段：**
+- `type`：根据告警字段自动拼接，如 `"湿度异常,空调异常"`
+- `e_msg`：生成详细描述，如 `"湿度异常，烟雾正常，风机正常，空调异常，电源正常"`
+
+> **注意**：异常数据的 `d_no` 目前硬编码为 `'202177'`。
+
+#### 心跳数据（heart_beat）
+
+心跳消息为纯文本格式，内容为设备编号：
 
 ```
-IoT 设备 → MQTT Broker → MQTT Client (mqttClient.js)
-                              ↓
-                         messageRouter.js (按主题分发)
-                        /         |          \
-                       ↓          ↓           ↓
-              sensorHandler  behaviorHandler  errorHandler
-              (sensor_data)  (behavioral_data) (abnormal_state)
-                       ↓          ↓           ↓
-                    MySQL  ← 数据入库  →  WebSocket 广播
-                                          ↓
-                                    前端客户端
+202106
 ```
 
-### 9.2 核心组件
+### 8.4 指令下发格式（direct_data）
 
-#### `mqtt/index.js` - MQTT 客户端入口
-
-- 继承自 `EventEmitter`，是一个事件发射器。
-- 初始化 MQTT 客户端并订阅配置的主题。
-- 当收到处理后的消息时，触发 `processedMessage` 事件。
-- `app.js` 监听此事件，将数据通过 WebSocket 广播给前端。
-
-#### `mqtt/mqttClient.js` - MQTT 客户端核心
-
-- 使用 `mqtt.js` 库连接 MQTT Broker。
-- 支持自动重连。
-- 提供 `publish()` 方法用于向设备下发指令。
-- 暴露 `isConnected` 状态和 `config` 配置。
-
-#### `mqtt/messageRouter.js` - 消息路由器
-
-- 根据 MQTT 主题将消息分发到对应的处理器。
-- 主题映射规则：
-  - `sensor_data` → `sensorHandler`
-  - `behavioral_data` → `behaviorHandler`
-  - `abnormal_state` → `errorHandler`
-
-#### `mqtt/deviceManager.js` - 设备管理器
-
-- 管理设备的在线状态。
-- 跟踪设备的上次活跃时间。
-- 提供设备状态查询接口。
-
-### 9.3 消息处理器
-
-每个处理器遵循相同的模式：
-
-1. 解析 JSON 消息体
-2. 提取 `d_no`（设备编号）
-3. 将动态字段存入对应的实时数据表
-4. 返回处理后的数据
-
-#### sensorHandler.js - 传感器数据处理器
-
-- 主题：`sensor_data`
-- 目标表：`t_sensor_realtime`
-- 处理逻辑：将 `d_no` 之外的字段动态插入实时表
-
-#### behaviorHandler.js - 行为数据处理器
-
-- 主题：`behavioral_data`
-- 目标表：`t_behavior_realtime`
-- 处理逻辑：将 `d_no` 之外的字段动态插入实时表
-
-#### errorHandler.js - 异常数据处理器
-
-- 主题：`abnormal_state`
-- 目标表：`t_error_history`
-- 处理逻辑：将 `d_no` 之外的字段动态插入历史表
-
-### 9.4 数据流完整链路
-
-```
-1. IoT 设备通过 MQTT 协议上报数据到 Broker
-2. MQTT Client 收到消息
-3. messageRouter 根据主题分发到对应 handler
-4. handler 解析数据并存入 MySQL
-5. handler 返回处理后的数据
-6. mqtt/index.js 触发 'processedMessage' 事件
-7. app.js 监听到事件，通过 WebSocket 广播给前端
-8. 前端收到实时数据，更新页面
+```json
+{
+  "d_no": "202106",
+  "config_id": "temp_threshold",
+  "config_value": "35"
+}
 ```
 
 ---
 
-## 10. WebSocket 实时推送
+## 9. WebSocket 实时推送
 
-### 10.1 连接方式
-
-前端通过 WebSocket 连接到：
+### 9.1 连接地址
 
 ```
 ws://localhost:3000/ws
 ```
 
-### 10.2 消息格式
+### 9.2 消息格式
 
 服务端推送的消息格式：
 
@@ -645,303 +880,486 @@ ws://localhost:3000/ws
 {
   "type": "sensor_data",
   "payload": { ... },
-  "timestamp": 1704067200000
+  "timestamp": 1705300000000
 }
 ```
 
-**type 取值：**
+**消息类型（type）：**
 
-| 类型 | 说明 |
-|------|------|
-| `sensor_data` | 传感器实时数据 |
-| `behavior_data` | 行为实时数据 |
-| `error_data` | 异常状态数据 |
-| `unknown` | 未知类型 |
+| type 值 | 说明 |
+|---------|------|
+| sensor_data | 传感器实时数据 |
+| behavior_data | 行为实时数据 |
+| error_data | 异常状态数据 |
 
-### 10.3 心跳机制
+### 9.3 客户端心跳
 
-- 客户端发送 `{"type": "ping"}` 维持连接。
-- 服务端回复 `{"type": "pong"}`。
+客户端应定期发送心跳以保持连接：
 
-### 10.4 广播函数
-
-`app.js` 中的 `broadcast(type, payload)` 函数：
-- 遍历所有已连接的 WebSocket 客户端。
-- 仅向 `readyState === 1`（OPEN）的客户端发送消息。
-- 自动清理已断开的客户端连接。
-
----
-
-## 11. 服务层详解
-
-### 11.1 设备管理服务 (`service/deviceData/`)
-
-#### `getDeviceManageList.js` - 获取设备列表
-
-- 支持分页查询。
-- 支持按关键字搜索（设备名称/编号）。
-- 返回分页信息和设备数据列表。
-
-#### `addDeviceManageData.js` - 添加设备
-
-- 接收前端提交的设备信息。
-- 插入 `t_device` 表。
-- 字段：`id`, `device_name`, `remarks`, `ctime`, `number`。
-
-#### `deleteDeviceManageData.js` - 删除设备
-
-- 根据主键 `id` 删除设备记录。
-- 使用参数化查询防止 SQL 注入。
-
-#### `updateDeviceManageData.js` - 更新设备
-
-- 支持修改设备 ID、名称、编号和备注。
-- 使用 `oldId` 定位原记录，`id` 作为新 ID。
-- 校验必填字段（设备名称和编号不能为空）。
-- 检查 `affectedRows` 确认更新成功。
-
-### 11.2 历史数据服务 (`service/historyData/`)
-
-#### `getHistoryDataByType.js` - 按类型查询历史数据
-
-- 支持三种数据类型：`sensor`、`behavior`、`error`。
-- 根据类型动态选择查询表和字段映射。
-- 支持分页、时间范围筛选和设备编号筛选。
-- 使用字段映射表将数据库字段名转换为前端显示名。
-
-### 11.3 故障历史服务 (`service/errorHistory/`)
-
-#### `getErrorHistory.js` - 获取故障历史
-
-- 分页查询 `t_error_msg` 表。
-- 支持按设备编号和时间范围筛选。
-
-#### `getErrorTypeStats.js` - 获取故障类型统计
-
-- 按故障类型分组统计数量。
-- 支持时间范围筛选。
-- 用于前端故障分析图表。
-
-### 11.4 指令配置服务 (`service/directData/`)
-
-#### `updateDirectConfigAndPublish.js` - 更新指令并发布
-
-- 更新数据库中的指令配置。
-- 通过 MQTT 客户端将指令发布到 Broker。
-- 实现远程设备控制。
-
-#### `updateMultipleDirectConfigs.js` - 批量更新指令配置
-
-- 支持一次更新多条指令配置。
-- 事务处理确保数据一致性。
-
----
-
-## 12. 控制器层详解
-
-控制器层遵循"薄控制器"原则，只负责：
-1. 接收 HTTP 请求
-2. 调用对应的服务层函数
-3. 返回 JSON 响应
-4. 统一错误处理
-
-### 控制器列表
-
-| 控制器文件 | 对应路由 | 说明 |
-|-----------|----------|------|
-| `controllers/sensor/sensorRealtime.js` | `GET /data` | 传感器实时数据（含故障和行为数据） |
-| `controllers/sensor/historyData.js` | `GET /dataByType` | 历史数据查询 |
-| `controllers/device/deviceManageList.js` | `GET /deviceData` | 设备列表 |
-| `controllers/error/errorHistory.js` | `GET /errData` | 故障历史 |
-| `controllers/error/errorTypeStats.js` | `GET /errTypeStats` | 故障类型统计 |
-| `controllers/direct/directConfigTree.js` | `GET /directData` | 指令配置树 |
-| `controllers/direct/directConfigRender.js` | `GET /directRender` | 指令配置渲染 |
-
----
-
-## 13. 中间件与工具函数
-
-### 13.1 中间件
-
-在 `app.js` 中配置的中间件：
-
-```javascript
-app.use(cors());           // 跨域支持
-app.use(express.json());   // JSON 请求体解析
-app.use(express.static()); // 静态文件服务
+```json
+{ "type": "ping" }
 ```
 
-### 13.2 工具函数 (`utils/helper.js`)
+服务端回复：
 
-#### `formatDataWithUnit(data, fieldMapping, fieldUnit)`
+```json
+{ "type": "pong" }
+```
 
-- 将数据中的数值拼接上单位字符串。
-- 例如：`25.3` → `"25.3 ℃"`。
-- **注意**：当前代码中此函数已被注释，前端图表需要纯数值，由前端自行拼接单位。
+### 9.4 前端使用示例
 
-#### `buildDisplayFieldUnits(fieldMapping, fieldUnit)`
+```javascript
+const ws = new WebSocket('ws://localhost:3000/ws')
 
-- 构建字段名到单位的映射对象。
-- 返回格式：`{ "温度": "℃", "湿度": "%RH" }`。
-- 前端根据此映射在显示时拼接单位。
+ws.onopen = () => {
+  console.log('WebSocket 已连接')
+  // 启动心跳
+  setInterval(() => {
+    ws.send(JSON.stringify({ type: 'ping' }))
+  }, 30000)
+}
+
+ws.onmessage = (event) => {
+  const { type, payload, timestamp } = JSON.parse(event.data)
+  switch (type) {
+    case 'sensor_data':
+      updateSensorDisplay(payload)
+      break
+    case 'behavior_data':
+      updateBehaviorDisplay(payload)
+      break
+    case 'error_data':
+      showErrorAlert(payload)
+      break
+  }
+}
+
+ws.onclose = () => {
+  console.log('WebSocket 已断开')
+}
+```
 
 ---
 
-## 14. 开发指南
+## 10. 核心模块详解
 
-### 14.1 添加新 API 接口
+### 10.1 MQTT 模块架构
 
-1. **创建服务层文件**：在 `service/` 下创建对应的业务逻辑文件。
-2. **创建控制器文件**：在 `controllers/` 下创建控制器，调用服务层。
-3. **注册路由**：在 `routes/sensorRoutes.js` 中添加路由映射。
-4. **测试接口**：使用 Postman 或 curl 测试。
+```
+mqtt/index.js（入口）
+    │
+    ├── mqttClient.js（MQTT 客户端）
+    │   ├── 连接/重连管理
+    │   ├── 发布消息（publish）
+    │   └── 订阅主题（subscribe）
+    │
+    ├── messageRouter.js（消息路由器）
+    │   └── 按主题分发到对应处理器
+    │
+    ├── deviceManager.js（设备管理器）
+    │   ├── 心跳检测（30秒超时判定离线）
+    │   ├── 在线状态管理
+    │   └── 暂存指令队列（设备上线后自动下发）
+    │
+    ├── sensorRealtime/（传感器数据处理）
+    ├── behaviorRealtime/（行为数据处理）
+    └── errorHistory/（异常状态数据处理）
+```
 
-**示例：添加一个获取设备数量的接口**
+### 10.2 mqttClient.js - MQTT 客户端
+
+核心功能：
 
 ```javascript
-// 1. service/deviceData/getDeviceCount.js
-const promisePool = require('../../config/promisepool')
+// 创建客户端
+const client = new MqttClient(config)
 
-module.exports = async () => {
-    const [rows] = await promisePool.query('SELECT COUNT(*) AS count FROM t_device')
-    return { success: true, count: rows[0].count }
+// 发布消息（自动 JSON 序列化）
+client.publish('topic', { key: 'value' })
+
+// 订阅主题
+client.subscribe('topic', { qos: 1 })
+
+// 检查连接状态
+client.isConnected  // true/false
+
+// 事件监听
+client.on('message', (topic, payload) => {})
+client.on('connect', () => {})
+client.on('reconnect', () => {})
+client.on('error', (err) => {})
+```
+
+**重连机制：**
+- 重连间隔：5 秒
+- 连接超时：10 秒
+- 自动重连：启用
+
+### 10.3 messageRouter.js - 消息路由器
+
+```javascript
+const router = new MessageRouter()
+
+// 注册处理器
+router.register('sensor_data', handleSensorData)
+router.register('behavioral_data', handleBehaviorData)
+
+// 路由消息
+const result = await router.route(topic, payload)
+// result = { topic: 'sensor_data', data: { ... } } 或 null
+```
+
+### 10.4 deviceManager.js - 设备管理器
+
+**心跳检测机制：**
+- 收到心跳 → 更新设备最后活跃时间
+- 每 10 秒检查一次 → 超过 30 秒未收到心跳 → 标记为离线
+- 设备重新上线 → 自动下发暂存指令
+
+**暂存指令机制：**
+```javascript
+// 添加暂存指令（设备离线时）
+deviceManager.addPendingCommand(deviceId, configId, value)
+
+// 检查设备是否在线
+deviceManager.isOnline(deviceId)
+
+// 设备上线时自动下发所有暂存指令
+```
+
+### 10.5 数据处理器
+
+每个数据处理器遵循相同的模式：
+
+```
+MQTT 消息 → Handler（解析/验证） → Repository（数据库操作）
+```
+
+**sensorRealtimeHandler.js 处理流程：**
+1. 解析 JSON 消息
+2. 提取字段（VID, PID, Tin, Tout, LXin, Time, online）
+3. 调用 `sensorRealtimeRepository.saveSensorData()` 存入数据库
+4. 返回处理后的数据
+
+**behaviorRealtimeHandler.js 处理流程：**
+1. 解析 JSON 消息
+2. 提取字段（mode, fan, fan_speed, air, acmode, air_power, led, led_power, Time, online）
+3. 调用 `behaviorRealtimeRepository.saveBehaviorData()` 存入数据库
+4. 返回处理后的数据
+
+**errorHistoryHandler.js 处理流程：**
+1. 解析 JSON 消息
+2. 提取告警字段（humi_warn, smog_warn 等）
+3. 自动生成 `type`（故障类型）和 `e_msg`（故障描述）
+4. 调用 `errorHistoryRepository.saveErrorMsg()` 存入数据库
+5. 返回处理后的数据
+
+### 10.6 指令下发流程
+
+```
+前端请求 → POST /directData/update
+    │
+    ├── 1. 更新数据库 t_direct_config
+    │
+    ├── 2. 构建 MQTT 消息
+    │
+    ├── 3. 发布到 direct_data 主题（第1次）
+    │
+    ├── 4. 等待 100ms
+    │
+    ├── 5. 发布到 direct_data 主题（第2次）
+    │
+    └── 6. 添加到设备暂存队列
+         └── 设备上线时自动下发
+```
+
+> **为什么发布两次？** 确保在不可靠的网络环境下设备能收到指令。
+
+---
+
+## 11. 开发指南
+
+### 11.1 添加新的 API 接口
+
+1. **创建控制器**：在 `controllers/` 下创建对应的控制器文件
+2. **创建服务层**（可选）：在 `service/` 下创建对应的服务文件
+3. **注册路由**：在 `routes/sensorRoutes.js` 中添加路由
+
+示例 - 添加一个获取设备数量的接口：
+
+```javascript
+// controllers/device/deviceCount.js
+const promisePool = require('../../config/dbPool')
+
+async function getDeviceCount(req, res) {
+  try {
+    const [rows] = await promisePool.query('SELECT COUNT(*) as count FROM t_device')
+    res.json({ success: true, data: rows[0].count })
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message })
+  }
 }
 
-// 2. controllers/device/deviceCount.js
-const getDeviceCount = require('../../service/deviceData/getDeviceCount')
+module.exports = getDeviceCount
+```
 
-module.exports = async (req, res) => {
-    try {
-        const result = await getDeviceCount()
-        res.json(result)
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
-    }
-}
-
-// 3. routes/sensorRoutes.js 中添加
+```javascript
+// routes/sensorRoutes.js 中添加
 const getDeviceCount = require('../controllers/device/deviceCount')
 router.get('/deviceCount', getDeviceCount)
 ```
 
-### 14.2 添加新的 MQTT 主题处理器
+### 11.2 添加新的 MQTT 主题处理器
 
-1. 在 `mqtt/handlers/` 下创建处理器文件。
-2. 实现 `handleXxxData(topic, payload)` 函数。
-3. 在 `mqtt/messageRouter.js` 中注册主题映射。
-4. 在 `mqtt/index.js` 中订阅新主题。
+1. 在 `mqtt/` 下创建新的模块目录（如 `mqtt/newTopic/`）
+2. 创建 Handler 和 Repository 文件
+3. 在 `mqtt/index.js` 中注册
 
-### 14.3 数据库迁移
+示例：
 
-- 使用 SQL 脚本管理数据库变更。
-- 新脚本放在 `init/` 目录下。
-- 执行前备份生产数据库。
+```javascript
+// mqtt/newTopic/newTopicHandler.js
+const repository = require('./newTopicRepository')
 
-### 14.4 错误处理规范
+const NEW_TOPIC = 'new_topic'
 
-- 服务层：抛出异常或返回 `{ success: false, message: "..." }`。
-- 控制器层：捕获异常，返回 500 状态码和错误信息。
-- 统一日志格式：`console.log("[模块名] 描述:", 详情)`。
+async function handleMessage(topic, payload) {
+  try {
+    const data = JSON.parse(payload.toString())
+    await repository.saveData(data)
+    return { topic, data }
+  } catch (err) {
+    console.error('[NewTopic] 处理失败:', err.message)
+    return null
+  }
+}
+
+module.exports = { handleMessage, NEW_TOPIC }
+```
+
+```javascript
+// mqtt/index.js 中添加
+const { handleMessage: handleNewTopic, NEW_TOPIC } = require('./newTopic/newTopicHandler')
+
+// 添加到订阅列表
+mqttClient.subscribe(NEW_TOPIC, { qos: 1 })
+
+// 注册到路由器
+messageRouter.register(NEW_TOPIC, handleNewTopic)
+```
+
+### 11.3 代码规范
+
+- **控制器（Controller）**：只处理 HTTP 请求/响应，不包含业务逻辑
+- **服务层（Service）**：包含业务逻辑，调用 Repository 或数据库
+- **处理器（Handler）**：处理 MQTT 消息，调用 Repository 存储数据
+- **仓库（Repository）**：封装数据库操作，只处理数据存取
+- **错误处理**：所有异步操作使用 try/catch，错误信息统一返回 `{ success: false, message: err.message }`
+
+### 11.4 日志规范
+
+```javascript
+// 成功日志
+console.log('[模块名] 操作成功描述')
+
+// 错误日志
+console.error('[模块名] 操作失败:', err.message)
+
+// 警告日志
+console.warn('[模块名] 警告信息')
+```
 
 ---
 
-## 15. 常见问题排查
+## 12. 常见问题
 
-### 15.1 数据库连接失败
+### 12.1 MQTT 连接失败
 
-**现象：** 启动时输出 `Database connection failed`
-
-**排查步骤：**
-1. 检查 MySQL 服务是否运行。
-2. 检查 `.env` 中的数据库配置是否正确。
-3. 检查数据库 `task` 是否存在。
-4. 检查用户权限。
-
-### 15.2 MQTT 连接失败
-
-**现象：** 启动 5 秒后输出 `⚠️ MQTT 尚未连接`
+**现象：** 启动时显示 `⚠️ MQTT 尚未连接`
 
 **排查步骤：**
-1. 检查 MQTT Broker 是否运行。
-2. 检查 `.env` 中的 `MQTT_URL` 配置。
-3. 访问 `http://localhost:3000/api/mqtt/status` 查看连接状态。
-4. 检查防火墙是否阻止 1883 端口。
 
-### 15.3 WebSocket 连接失败
+1. 检查 MQTT Broker 是否运行：
+   ```bash
+   netstat -an | findstr :1883
+   ```
 
-**现象：** 前端无法收到实时数据
+2. 检查 `.env` 中的 `MQTT_URL` 配置是否正确
 
-**排查步骤：**
-1. 确认 WebSocket 地址为 `ws://localhost:3000/ws`。
-2. 检查浏览器控制台是否有跨域错误。
-3. 确认 MQTT 客户端已连接并收到数据。
-4. 检查 `broadcast` 函数是否正确执行。
+3. 检查防火墙是否阻止了 1883 端口
 
-### 15.4 API 返回 404
+4. 查看 `.backend-err.log` 中的详细错误信息
 
-**现象：** 请求 API 返回 404
+### 12.2 数据库连接失败
+
+**现象：** 启动时没有显示 `✅ 数据库连接成功`
 
 **排查步骤：**
-1. 检查路由是否在 `routes/sensorRoutes.js` 中注册。
-2. 检查 HTTP 方法（GET/POST）是否匹配。
-3. 检查请求路径是否正确。
 
-### 15.5 数据查询为空
+1. 检查 MySQL 服务是否运行：
+   ```bash
+   net start | findstr MySQL
+   ```
 
-**现象：** API 返回成功但数据为空
+2. 检查 `.env` 中的数据库配置（DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME）
+
+3. 尝试手动连接：
+   ```bash
+   mysql -u root -p -h localhost -P 3306
+   ```
+
+4. 确认数据库 `third` 已创建：
+   ```sql
+   CREATE DATABASE IF NOT EXISTS third DEFAULT CHARACTER SET utf8mb4;
+   ```
+
+### 12.3 数据没有入库
+
+**现象：** MQTT 已连接，但数据库中没有数据
 
 **排查步骤：**
-1. 检查数据库中是否有数据。
-2. 检查查询条件是否正确（如时间范围、设备编号）。
-3. 检查字段映射表 `t_sensor_field_mapper` 中 `visible` 是否为 1。
 
-### 15.6 日志查看
+1. 检查 MQTT 是否收到消息（查看控制台日志）
 
-错误日志输出到控制台和 `server/.backend-err.log` 文件。
+2. 检查数据库表结构是否与 SQL 脚本一致
+
+3. 检查字段映射是否正确（特别是 `online` 字段的格式）
+
+4. 查看 `.backend-err.log` 中的数据库错误信息
+
+### 12.4 WebSocket 连接不上
+
+**现象：** 前端无法连接到 WebSocket
+
+**排查步骤：**
+
+1. 确认后端服务正在运行
+
+2. 检查 WebSocket URL 是否正确：`ws://localhost:3000/ws`
+
+3. 检查是否有代理或防火墙阻止 WebSocket 连接
+
+4. 查看浏览器控制台的 WebSocket 错误信息
+
+### 12.5 指令下发后设备没有响应
+
+**现象：** 通过 API 下发指令后，设备没有执行
+
+**排查步骤：**
+
+1. 检查 MQTT 连接状态：`GET /mqtt/status`
+
+2. 检查设备是否在线（通过心跳检测）
+
+3. 检查指令格式是否正确
+
+4. 查看控制台是否有 MQTT 发布成功的日志
+
+5. 如果设备离线，指令会暂存，设备上线后自动下发
+
+### 12.6 设备状态不显示（前端显示"暂无设备数据"）
+
+**现象：** 菜单页面设备状态卡片显示"暂无设备数据"
+
+**排查步骤：**
+
+1. **检查数据库 t_device 表是否有设备记录：**
+   ```sql
+   SELECT number, device_name FROM t_device;
+   ```
+
+2. **确认设备编号（number）不为空：**
+   - `DeviceManager` 以 `number` 字段作为设备唯一标识
+   - 如果 `number` 为 NULL，该设备不会被加载
+   - 在设备管理页面添加设备时，**必须填写设备编号**
+
+3. **检查设备是否发送了心跳：**
+   - 查看后端控制台是否有 `[MQTT] 收到消息` 日志
+   - 心跳消息应包含 `online` 字段
+   - `DeviceManager.onHeartbeat()` 收到心跳后才会标记设备在线
+
+4. **自动发现机制：**
+   - 即使数据库中没有设备记录，只要设备发送了心跳，`DeviceManager` 会自动发现并跟踪
+   - 收到心跳后刷新前端页面即可显示
+
+5. **检查 WebSocket 连接：**
+   - 确认前端 WebSocket 已连接（控制台显示 `[WebSocket] 客户端已连接`）
+   - 检查 WebSocket 消息中是否包含 `deviceStatus` 字段
+
+6. **重启后端服务：**
+   ```bash
+   # 查找并杀掉旧进程
+   netstat -ano | findstr :3000
+   taskkill /PID <PID> /F
+   # 重新启动
+   cd server && node app.js
+   ```
+
+### 12.7 端口被占用
+
+**现象：** 启动时显示 `EADDRINUSE`
+
+**解决方法：**
 
 ```bash
-# 查看实时日志
-npm run dev
+# 查找占用端口的进程
+netstat -ano | findstr :3000
 
-# 查看错误日志文件
-cat .backend-err.log
+# 终止进程（替换 PID）
+taskkill /PID <PID> /F
+
+# 或修改 .env 中的 PORT 为其他端口
+PORT=3001
 ```
 
 ---
 
 ## 附录
 
-### A. 常用命令
+### A. 常用命令速查
 
 ```bash
-# 启动开发服务器
-npm run dev
+# 启动服务
+cd server && node app.js
 
-# 启动生产服务器
-npm start
+# 开发模式（需要 nodemon）
+cd server && npm run dev
 
-# 安装依赖
-npm install
+# 测试 API
+Invoke-RestMethod -Uri http://localhost:3000/data
 
-# 查看 MQTT 连接状态
-curl http://localhost:3000/api/mqtt/status
+# 查看 MQTT 状态
+Invoke-RestMethod -Uri http://localhost:3000/mqtt/status
+
+# 查看日志
+type .backend-err.log
+
+# 连接 MySQL
+mysql -u root -p third
+
+# 订阅 MQTT 主题（调试用）
+mosquitto_sub -t "sensor_data" -v
 ```
 
-### B. 依赖清单
+### B. 相关文件说明
+
+| 文件 | 说明 |
+|------|------|
+| `wusiqi.sql` | 完整数据库初始化脚本（建库+建表+初始数据） |
+| `init/init_calibrate_time.sql` | 校准时间初始化脚本 |
+| `.env.example` | 环境变量模板（提交到 Git） |
+| `.env` | 实际环境变量（不提交到 Git） |
+| `.backend-err.log` | 运行时错误日志（自动生成） |
+| `package.json` | 依赖和脚本配置 |
+
+### C. 依赖清单
 
 | 包名 | 版本 | 用途 |
 |------|------|------|
-| express | ^4.x | Web 框架 |
-| mysql2 | ^3.x | MySQL 驱动 |
-| mqtt | ^5.x | MQTT 客户端 |
-| ws | ^8.x | WebSocket 服务端 |
-| cors | ^2.x | 跨域支持 |
-| nodemon | ^3.x | 开发热重载 |
-
-### C. 端口说明
-
-| 端口 | 用途 |
-|------|------|
-| 3000 | HTTP API + WebSocket |
-| 3306 | MySQL 数据库 |
-| 1883 | MQTT Broker（默认） |
+| express | ^4.18 | Web 框架 |
+| mysql2 | ^3.6 | MySQL 驱动（支持 Promise） |
+| mqtt | ^5.0 | MQTT 客户端 |
+| ws | ^8.14 | WebSocket 服务端 |
+| cors | ^2.8 | 跨域支持 |
+| dotenv | ^16.3 | 环境变量加载 |
+| nodemon | ^3.0 | 开发热重载（devDependencies） |

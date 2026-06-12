@@ -1,4 +1,4 @@
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 async function saveBehaviorData(info) {
     // Keep the database column order aligned with the MQTT payload mapping.

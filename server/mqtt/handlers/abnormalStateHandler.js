@@ -1,24 +1,25 @@
 /**
- * 传感器数据处理器
+ * 异常状态处理器
  * 
- * 收到传感器数据后，解析并存入数据库
+ * 收到设备上报的异常状态数据后，解析并存入数据库。
+ * 原名为 errorHandler，因处理的是设备异常状态而非代码错误，更名为 abnormalStateHandler。
  */
 
 const promisePool = require('../../config/dbPool')
 
-/** 传感器数据主题 */
-const SENSOR_TOPIC = 'sensor_data'
+/** 异常状态数据主题 */
+const ABNORMAL_STATE_TOPIC = 'abnormal_state'
 
 /**
- * 处理传感器数据消息
+ * 处理异常状态数据消息
  * @param {string} topic - 主题
  * @param {Buffer} payload - 消息内容
  * @returns {Promise<Object|null>} 处理后的数据
  */
-async function handleSensorData(topic, payload) {
+async function handleAbnormalStateData(topic, payload) {
   try {
     const data = JSON.parse(payload.toString())
-    console.log('[SensorHandler] 收到传感器数据:', JSON.stringify(data).slice(0, 200))
+    console.log('[AbnormalStateHandler] 收到异常状态数据:', JSON.stringify(data).slice(0, 200))
 
     // 存入数据库
     const { d_no, ...fields } = data
@@ -30,16 +31,16 @@ async function handleSensorData(topic, payload) {
 
       try {
         const [result] = await promisePool.query(
-          `INSERT INTO t_sensor_realtime (d_no, ${colNames}) VALUES (?, ${placeholders})`,
+          `INSERT INTO t_error_history (d_no, ${colNames}) VALUES (?, ${placeholders})`,
           [d_no, ...values]
         )
-        console.log('[SensorHandler] 数据存储成功:', {
+        console.log('[AbnormalStateHandler] 数据存储成功:', {
           d_no,
           insertId: result.insertId,
           fields: JSON.stringify(fields)
         })
       } catch (dbErr) {
-        console.error('[SensorHandler] 数据存储失败:', {
+        console.error('[AbnormalStateHandler] 数据存储失败:', {
           d_no,
           fields: JSON.stringify(fields),
           error: dbErr.message,
@@ -51,7 +52,7 @@ async function handleSensorData(topic, payload) {
 
     return data
   } catch (err) {
-    console.error('[SensorHandler] 处理失败:', {
+    console.error('[AbnormalStateHandler] 处理失败:', {
       error: err.message,
       stack: err.stack,
       rawPayload: payload ? payload.toString().slice(0, 200) : 'empty'
@@ -60,4 +61,4 @@ async function handleSensorData(topic, payload) {
   }
 }
 
-module.exports = { handleSensorData, SENSOR_TOPIC }
+module.exports = { handleAbnormalStateData, ABNORMAL_STATE_TOPIC }

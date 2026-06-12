@@ -3,6 +3,25 @@
     <view class="header">
     </view>
 
+    <!-- 设备在线状态卡片 -->
+    <view class="group">
+      <text class="group-title">设备在线状态</text>
+      <view class="device-grid">
+        <view
+          class="device-chip"
+          v-for="device in deviceStatusList"
+          :key="device.deviceId"
+          :class="{ online: device.online, offline: !device.online }"
+        >
+          <text class="chip-dot"></text>
+          <text class="chip-id">{{ device.deviceId }}</text>
+        </view>
+        <view v-if="deviceStatusList.length === 0" class="no-device">
+          <text>暂无设备数据</text>
+        </view>
+      </view>
+    </view>
+
     <view class="group">
       <text class="group-title">传感器数据</text>
       <navigator class="nav-item" url="/pages/sensorRealtime/sensorRealtime"
@@ -63,9 +82,36 @@
 </template>
 
 <script setup>
+import { ref, onMounted, onUnmounted } from "vue"
 import { displayStore } from "../../stores/displayStore"
+import { connect, on, close } from "../../utils/websocket"
 
 const visibility = displayStore()
+
+// 设备在线状态列表
+const deviceStatusList = ref([])
+
+// WebSocket 取消订阅函数
+let unsubscribe = null
+
+onMounted(() => {
+  // 连接 WebSocket
+  connect()
+
+  // 监听设备状态消息
+  unsubscribe = on("device_status", (payload) => {
+    if (Array.isArray(payload)) {
+      deviceStatusList.value = payload
+    }
+  })
+})
+
+onUnmounted(() => {
+  // 取消监听
+  if (unsubscribe) {
+    unsubscribe()
+  }
+})
 </script>
 <style>
 .page {
@@ -144,5 +190,62 @@ const visibility = displayStore()
 
 .setting-btn:last-child {
   margin-bottom: 0;
+}
+
+/* 设备状态 - 小圆片样式 */
+.device-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.device-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 30rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+}
+
+.device-chip.online {
+  background: #d1fae5;
+  color: #065f46;
+  border: 2rpx solid #a7f3d0;
+}
+
+.device-chip.offline {
+  background: #f3f4f6;
+  color: #9ca3af;
+  border: 2rpx solid #e5e7eb;
+}
+
+.chip-dot {
+  display: inline-block;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+}
+
+.device-chip.online .chip-dot {
+  background: #10b981;
+  box-shadow: 0 0 6rpx rgba(16, 185, 129, 0.5);
+}
+
+.device-chip.offline .chip-dot {
+  background: #d1d5db;
+}
+
+.chip-id {
+  font-size: 22rpx;
+}
+
+.no-device {
+  width: 100%;
+  text-align: center;
+  padding: 30rpx 0;
+  color: #9ca3af;
+  font-size: 26rpx;
 }
 </style>

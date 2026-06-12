@@ -92,7 +92,24 @@ function broadcast(type, payload) {
     deadClients.forEach((client) => wsClients.delete(client));
 }
 
-// 监听 MQTT 处理后的消息，广播给所有 WebSocket 客户端
+// ==================== 消息节流（Throttle） ====================
+// 避免底层高频数据导致前端页面闪烁
+// 传感器/行为/故障数据每 3 秒合并广播一次，设备状态每 2 秒广播一次
+
+/** 节流缓存：{ type: latestData } */
+const throttleCache = {}
+
+/** 各消息类型的节流间隔（毫秒） */
+const THROTTLE_INTERVALS = {
+    'sensor_data': 3000,
+    'behavior_data': 3000,
+    'error_data': 3000,
+}
+
+/** 各消息类型的定时器 */
+const throttleTimers = {}
+
+// 监听 MQTT 处理后的消息，先缓存最新数据，按节流间隔广播
 mqttClient.on('processedMessage', (topic, data) => {
     // 根据主题映射消息类型
     const typeMap = {
@@ -102,11 +119,37 @@ mqttClient.on('processedMessage', (topic, data) => {
     };
     const type = typeMap[topic] || 'unknown';
 
-    broadcast(type, data);
-});
+    // 非节流类型（如 unknown）直接广播
+    if (!THROTTLE_INTERVALS[type]) {
+        broadcast(type, data)
+        return
+    }
+
+    // 更新缓存中的最新数据
+    throttleCache[type] = data
+
+    // 如果该类型还没有定时器，启动一个
+    if (!throttleTimers[type]) {
+        throttleTimers[type] = setTimeout(() => {
+            // 广播缓存中的最新数据
+            if (throttleCache[type] !== undefined) {
+                broadcast(type, throttleCache[type])
+                delete throttleCache[type]
+            }
+            delete throttleTimers[type]
+        }, THROTTLE_INTERVALS[type])
+    }
+})
 
 // 导出 broadcast 函数，供其他模块使用（如控制器需要主动推送时）
 app.set('wsBroadcast', broadcast);
+
+// ==================== 设备在线状态定时广播 ====================
+// 每 2 秒广播一次所有设备的在线状态，接近实时
+setInterval(() => {
+    const deviceStatus = mqttClient.getAllDeviceStatus();
+    broadcast('device_status', deviceStatus);
+}, 2000);
 
 // 检查 MQTT 初始连接状态
 setTimeout(() => {

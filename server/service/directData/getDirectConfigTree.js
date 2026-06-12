@@ -1,4 +1,4 @@
-const promisePool = require('../../config/promisepool')
+const promisePool = require('../../config/dbPool')
 
 // 把扁平的指令配置表转成页面要用的树形结构。
 module.exports = async function getDirectConfigTree() {
