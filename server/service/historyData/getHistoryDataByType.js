@@ -56,7 +56,6 @@ module.exports = async function getHistoryDataByType(query) {
         throw new Error('开始时间不能大于结束时间')
     }
 
-    // 让前端字段名和数据库字段映射保持同步。
     const [fieldMapper] = await promisePool.query(
         `SELECT f_name, db_name, unit FROM ${fieldMappingTable} WHERE visible = 1`
     )
@@ -75,9 +74,6 @@ module.exports = async function getHistoryDataByType(query) {
     for (const key in fieldMapping) {
         searchMapper.push(`${key} AS \`${fieldMapping[key]}\``)
     }
-    // if (type === 'behavior') {
-    //     searchMapper.push('field5 AS 采集时间')
-    // }如果要有采集时间
     searchMapper.push('c_time AS 创立时间')
     searchMapper.push('online AS 数据类型')
 

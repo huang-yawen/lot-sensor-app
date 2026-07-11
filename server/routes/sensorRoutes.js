@@ -19,6 +19,9 @@ const getErrorTypeStats = require('../controllers/error/errorTypeStats')
 const getDirectConfigTree = require('../controllers/direct/directConfigTree')
 const getDirectConfigRender = require('../controllers/direct/directConfigRender')
 
+// 智能判定控制器
+const intelligentRecognize = require('../controllers/intelligent/recognize')
+
 // 指令配置服务
 const updateMultipleDirectConfigs = require('../service/directData/updateMultipleDirectConfigs')
 const updateDirectConfigAndPublish = require('../service/directData/updateDirectConfigAndPublish')
@@ -36,6 +39,9 @@ router.post('/deviceData/update', updateDevice)
 // 故障接口
 router.get('/errData', getErrorHistory)
 router.get('/errTypeStats', getErrorTypeStats)
+
+// 智能判定接口
+router.post('/intelligent/recognize', intelligentRecognize)
 
 // 指令配置接口
 router.get('/directData', getDirectConfigTree)

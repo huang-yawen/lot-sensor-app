@@ -10,7 +10,7 @@ async function saveSensorData(info) {
         info.LXin ?? null,
         info.c_time ?? null,
         // 先转成字符串，去掉两边空格，再进行比对；同时兼容布尔值 true
-        (String(info.online).trim() === '1' || info.online === true) ? '实时数据' : '保留数据'
+        (String(info.online).trim() === '1' || info.online === true) ? '实时数据' : '保存数据'
     ]
 
     try {
