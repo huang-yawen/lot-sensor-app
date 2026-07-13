@@ -43,6 +43,12 @@ router.get('/errTypeStats', getErrorTypeStats)
 // 智能判定接口
 router.post('/intelligent/recognize', intelligentRecognize)
 
+// 测试图表数据控制器
+const testEchartsData = require('../controllers/chart/testEchartsData')
+
+// 测试图表数据接口
+router.get('/testChartData', testEchartsData)
+
 // 指令配置接口
 router.get('/directData', getDirectConfigTree)
 router.get('/directRender', getDirectConfigRender)

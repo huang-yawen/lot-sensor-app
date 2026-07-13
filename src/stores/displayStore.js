@@ -1,47 +1,23 @@
+/**
+ * 显示控制 Store（移动端）
+ * 
+ * 【说明】
+ * 字段可见性现由后端 systemConfig.js 统一控制，
+ * 前端不再提供切换按钮，所有字段默认显示。
+ * 
+ * 此 store 仅保留 hideId / hideNumber 引用供 visibleEntries 过滤使用，
+ * 默认值均为 false（全部显示）。
+ */
+
 import { defineStore } from "pinia"
 import { ref } from "vue"
 
-const STORAGE_KEY = "fieldVisibilitySettings"
-
-const loadSettings = () => {
-  try {
-    const saved = uni.getStorageSync(STORAGE_KEY)
-    return saved && typeof saved === "object" ? saved : {}
-  } catch (error) {
-    return {}
-  }
-}
-
 export const displayStore = defineStore("displayStore", () => {
-  const saved = loadSettings()
-  const hideId = ref(!!saved.hideId)
-  const hideNumber = ref(!!saved.hideNumber)
-
-  const persist = () => {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        hideId: hideId.value,
-        hideNumber: hideNumber.value,
-      })
-    } catch (error) {
-      console.error("保存显示设置失败:", error)
-    }
-  }
-
-  const toggleHideId = () => {
-    hideId.value = !hideId.value
-    persist()
-  }
-
-  const toggleHideNumber = () => {
-    hideNumber.value = !hideNumber.value
-    persist()
-  }
+  const hideId = ref(false)
+  const hideNumber = ref(false)
 
   return {
     hideId,
     hideNumber,
-    toggleHideId,
-    toggleHideNumber,
   }
 })

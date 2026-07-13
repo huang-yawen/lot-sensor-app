@@ -1,16 +1,13 @@
 const promisePool = require('../../config/dbPool')
-
-// ============================================================
-// 【模式切换变量】SINGLE_DEVICE_MODE
-// 从 .env 环境变量读取，修改 server/.env 中的 SINGLE_DEVICE_MODE 即可全局生效
-// ============================================================
-const SINGLE_DEVICE_MODE = process.env.SINGLE_DEVICE_MODE === 'true'
+const systemConfig = require('../../config/systemConfig')
 
 // 组装全局配置和设备配置的最终渲染结果。
 module.exports = async (req, res) => {
     try {
         const d_no = req.query.d_no
-        console.log(`[Backend Render] 接收到请求 d_no: ${d_no}, mode: ${SINGLE_DEVICE_MODE ? '单设备' : '多设备'}`)
+        const config = systemConfig.getConfig()
+        const singleDeviceMode = config.SINGLE_DEVICE_MODE
+        console.log(`[Backend Render] 接收到请求 d_no: ${d_no}, mode: ${singleDeviceMode ? '单设备' : '多设备'}`)
 
         const queryGlobal = `SELECT config_id, value FROM t_direct WHERE d_no IS NULL`
         const [globalResult] = await promisePool.query(queryGlobal)
@@ -18,7 +15,7 @@ module.exports = async (req, res) => {
         let deviceResult = []
         let targetDeviceId = null
 
-        if (SINGLE_DEVICE_MODE) {
+        if (singleDeviceMode) {
             // ========== 单设备模式 ==========
             // 从 t_device 表获取第一个设备的编号
             const [deviceRows] = await promisePool.query(
@@ -59,7 +56,7 @@ module.exports = async (req, res) => {
             `[Backend Render] 全局配置项数: ${globalResult.length}, 设备特定项数: ${deviceResult.length}, 合并后项数: ${finalResult.length}`
         )
 
-        res.json({ success: true, data: finalResult, singleDeviceMode: SINGLE_DEVICE_MODE })
+        res.json({ success: true, data: finalResult, singleDeviceMode })
     } catch (err) {
         console.error('Backend /directRender 错误:', err)
         res.status(500).json({ success: false, message: 'Server error' })

@@ -451,7 +451,7 @@ onUnload(() => {
 
 .value {
   flex: 1;
-  text-align: right;
+  text-align: center;
   font-size: 26rpx;
   color: #374151;
 }

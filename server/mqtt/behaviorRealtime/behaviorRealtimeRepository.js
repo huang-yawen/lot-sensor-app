@@ -1,11 +1,31 @@
 const promisePool = require('../../config/dbPool')
 
+/**
+ * 从行为数据或 t_device 表获取设备编号，不硬编码
+ */
+async function getDeviceNo(info) {
+    if (info.VID) return String(info.VID).trim()
+    if (info.d_no) return String(info.d_no).trim()
+    if (info.DNO) return String(info.DNO).trim()
+    // 从 t_device 表取第一个设备编号
+    try {
+        const [rows] = await promisePool.query(
+            'SELECT `number` FROM `t_device` ORDER BY `id` ASC LIMIT 1'
+        )
+        if (rows && rows.length > 0) {
+            return String(rows[0].number).trim()
+        }
+    } catch (err) {
+        console.error('[BehaviorRealtime] 查询默认设备编号失败:', err.message)
+    }
+    return 'default_device'
+}
+
 async function saveBehaviorData(info) {
-    // Keep the database column order aligned with the MQTT payload mapping.
+    const d_no = await getDeviceNo(info)
+
     const params = [
-        // info.VID ?? info.d_no ?? info.DNO ?? null,
-        // 第三题写成默认的设备编号，因为现在只有一套设备
-        '202106',
+        d_no,
         info.mode ?? null,
         info.fan ?? null,
         info.fan_speed ?? null,
@@ -23,7 +43,7 @@ async function saveBehaviorData(info) {
             `INSERT INTO t_behavior_data (d_no, field1, field2, field3, field4, field5, field6, field7, field8, c_time, online) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             params
         )
-        console.log('[BehaviorRealtime] Data saved to database successfully')
+        console.log('[BehaviorRealtime] Data saved to database successfully, d_no:', d_no)
         return true
     } catch (err) {
         console.error('[BehaviorRealtime] Failed to save data:', err.message)

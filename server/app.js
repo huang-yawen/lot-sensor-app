@@ -5,6 +5,7 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 require('./config/env');
 const sensorRoutes = require('./routes/sensorRoutes');
+const configController = require('./controllers/system/configController');
 const mqttClient = require('./mqtt/index')
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -13,6 +14,14 @@ app.use(express.json());
       
 // Keep the API surface grouped behind a single router.
 app.use('/', sensorRoutes);
+
+// ==================== 系统配置 API ====================
+// 全局配置中心，支持热更新、导出/导入
+app.get('/api/system-config', configController.getConfig)
+app.post('/api/system-config', configController.updateConfig)
+app.post('/api/system-config/reset', configController.resetConfig)
+app.get('/api/system-config/export', configController.exportConfig)
+app.post('/api/system-config/import', configController.importConfig)
 
 // MQTT 连接状态诊断接口
 app.get('/api/mqtt/status', (req, res) => {
